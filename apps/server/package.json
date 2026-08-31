@@ -1,0 +1,21 @@
+{
+  "name": "@neonduel/server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Servidor autoritativo de NEONDUEL",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/server.js --external:ws --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\"",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --build"
+  },
+  "dependencies": {
+    "@neonduel/shared": "*",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.23.13"
+  }
+}
