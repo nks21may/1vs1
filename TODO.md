@@ -45,7 +45,7 @@ así se pudra.
 
 ## P1 — Lo que más se nota jugando
 
-- [ ] **T17. Quitar los dientes de sierra (antialiasing real)**
+- [x] **T17. Quitar los dientes de sierra (antialiasing real)**
   El renderer se crea con `antialias: true`, pero **no sirve de nada mientras el
   bloom esté encendido**: con post-proceso, la imagen final la produce el
   `EffectComposer` sobre su propio render target, y el multisampling del canvas se
@@ -65,6 +65,17 @@ así se pudra.
     es apreciable, exponerlo como ajuste junto a "Brillo (bloom)".
   - Hecho cuando: comparación de capturas antes/después de una arista diagonal del
     mapa que muestre el escalonado corregido, con el bloom activado.
+  - **Hecho (2026-09-03).** El `EffectComposer` ya recibía un `WebGLRenderTarget`
+    propio con `samples: min(4, maxSamples)`; lo que faltaba era comprobarlo, que es
+    para lo que está el banco de pruebas (`aa-preview.html`). Verificado en Chrome
+    sobre el mismo frame con el bloom encendido: sin multisampling las diagonales de
+    neón del suelo se rompen en trazos sueltos y solo 24 píxeles de 25.275 aristas
+    fuertes quedan en un valor intermedio (0,09%); con MSAA 4× son 4.532 (11,08%) y
+    las diagonales salen continuas. Un ciclo `setSize(960,540)` → `setSize(1280,720)`
+    devuelve exactamente las mismas cifras, así que el redimensionado no se lo come.
+  - **Queda medir el coste en una GPU real.** La comprobación corre sobre SwiftShader
+    (render por software), que no sirve para juzgar rendimiento, así que si el MSAA
+    debe exponerse como ajuste junto a «Brillo (bloom)» sigue sin poder decidirse.
 
 - [ ] **T18. Disparos más graves y con más cuerpo**
   Suenan finos y secos. El rifle usa un cuerpo de 150 Hz con un chasquido de
