@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="description" content="NEONDUEL - duelo 1 contra 1 en 3D con movilidad estilo CS2" />
+    <title>NEONDUEL</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2305070d'/%3E%3Cpath d='M16 5v22M5 16h22' stroke='%232ce8ff' stroke-width='2.5'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <canvas id="viewport"></canvas>
+
+    <!-- HUD del juego -->
+    <div id="hud" class="hud" hidden>
+      <div class="crosshair" id="crosshair" aria-hidden="true">
+        <span class="crosshair-dot"></span>
+        <span class="crosshair-line crosshair-line--top"></span>
+        <span class="crosshair-line crosshair-line--bottom"></span>
+        <span class="crosshair-line crosshair-line--left"></span>
+        <span class="crosshair-line crosshair-line--right"></span>
+      </div>
+
+      <div class="hitmarker" id="hitmarker" aria-hidden="true">
+        <span></span><span></span><span></span><span></span>
+      </div>
+
+      <div class="damage-vignette" id="damage-vignette" aria-hidden="true"></div>
+
+      <header class="scoreboard">
+        <div class="score score--self">
+          <span class="score-name" id="score-name-self">TU</span>
+          <span class="score-value" id="score-self">0</span>
+        </div>
+        <div class="round-info">
+          <span class="round-timer" id="round-timer">0:00</span>
+          <span class="round-phase" id="round-phase">CONECTANDO</span>
+        </div>
+        <div class="score score--enemy">
+          <span class="score-value" id="score-enemy">0</span>
+          <span class="score-name" id="score-name-enemy">RIVAL</span>
+        </div>
+      </header>
+
+      <div class="announcement" id="announcement" role="status" aria-live="polite"></div>
+
+      <ul class="killfeed" id="killfeed" aria-live="polite"></ul>
+
+      <footer class="status-bar">
+        <div class="status-block status-block--health">
+          <span class="status-label">VIDA</span>
+          <span class="status-value" id="health-value">100</span>
+          <div class="health-bar"><i id="health-bar-fill"></i></div>
+        </div>
+
+        <div class="speed-meter" aria-hidden="true">
+          <span class="status-label">VEL</span>
+          <span class="status-value status-value--small" id="speed-value">0</span>
+          <div class="speed-bar"><i id="speed-bar-fill"></i></div>
+        </div>
+
+        <div class="status-block status-block--ammo">
+          <span class="status-label" id="weapon-name">VEKTOR-9</span>
+          <span class="status-value" id="ammo-value">30</span>
+          <div class="reload-bar" id="reload-bar" hidden><i id="reload-bar-fill"></i></div>
+        </div>
+      </footer>
+
+      <div class="netgraph" id="netgraph">
+        <span id="net-ping">-- ms</span>
+        <span id="net-fps">-- fps</span>
+        <span id="net-tick">64 Hz</span>
+      </div>
+    </div>
+
+    <!-- Menu principal -->
+    <div class="overlay" id="menu">
+      <div class="panel">
+        <h1 class="logo">
+          NEON<span class="logo-accent">DUEL</span>
+        </h1>
+        <p class="tagline">Duelo 1 contra 1. Sin respawn. Movimiento de verdad.</p>
+
+        <form class="menu-form" id="menu-form">
+          <label class="field">
+            <span class="field-label">Alias</span>
+            <input
+              class="field-input"
+              id="name-input"
+              type="text"
+              maxlength="16"
+              autocomplete="off"
+              spellcheck="false"
+              required
+            />
+          </label>
+
+          <div class="button-row">
+            <button class="button button--primary" type="submit" id="play-online">
+              Buscar rival
+            </button>
+            <button class="button" type="button" id="play-bot">
+              Practicar con bot
+            </button>
+          </div>
+
+          <fieldset class="difficulty" id="difficulty">
+            <legend class="field-label">Nivel del bot</legend>
+            <label><input type="radio" name="skill" value="easy" /><span>Fácil</span></label>
+            <label
+              ><input type="radio" name="skill" value="normal" checked /><span>Normal</span></label
+            >
+            <label><input type="radio" name="skill" value="hard" /><span>Difícil</span></label>
+          </fieldset>
+        </form>
+
+        <details class="settings">
+          <summary>Ajustes</summary>
+          <div class="settings-grid">
+            <label class="field">
+              <span class="field-label">Sensibilidad <b id="sensitivity-label">2.00</b></span>
+              <input id="sensitivity" type="range" min="0.1" max="8" step="0.05" />
+            </label>
+            <label class="field">
+              <span class="field-label">Campo de visión <b id="fov-label">74</b></span>
+              <input id="fov" type="range" min="60" max="110" step="1" />
+            </label>
+            <label class="field">
+              <span class="field-label">Volumen <b id="volume-label">60%</b></span>
+              <input id="volume" type="range" min="0" max="1" step="0.05" />
+            </label>
+            <label class="checkbox">
+              <input id="invert-y" type="checkbox" /><span>Invertir eje vertical</span>
+            </label>
+            <label class="checkbox">
+              <input id="bloom" type="checkbox" /><span>Brillo (bloom)</span>
+            </label>
+            <label class="checkbox">
+              <input id="netgraph-toggle" type="checkbox" /><span>Mostrar red y FPS</span>
+            </label>
+          </div>
+        </details>
+
+        <div class="controls">
+          <h2 class="controls-title">Controles</h2>
+          <ul class="controls-list">
+            <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Moverse</li>
+            <li><kbd>Espacio</kbd> Saltar</li>
+            <li><kbd>Ctrl</kbd> Agacharse</li>
+            <li><kbd>Shift</kbd> Andar en silencio</li>
+            <li><kbd>Q</kbd> Cambiar de arma</li>
+            <li><kbd>R</kbd> Recargar</li>
+            <li><kbd>Clic</kbd> Disparar</li>
+            <li><kbd>Esc</kbd> Liberar el ratón</li>
+          </ul>
+          <p class="hint">
+            Suelta las teclas de dirección y pulsa la contraria para frenar en seco antes de
+            disparar: en movimiento el arma no acierta.
+          </p>
+        </div>
+
+        <p class="status-line" id="menu-status"></p>
+      </div>
+    </div>
+
+    <!-- Pausa / puntero liberado -->
+    <div class="overlay overlay--soft" id="pause" hidden>
+      <div class="panel panel--small">
+        <h2 class="panel-title">Partida en pausa</h2>
+        <p class="panel-text">El ratón está libre. La partida sigue en el servidor.</p>
+        <button class="button button--primary" type="button" id="resume">Volver al duelo</button>
+        <button class="button" type="button" id="leave">Salir al menú</button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
