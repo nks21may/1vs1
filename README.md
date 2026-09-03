@@ -120,6 +120,13 @@ ahí. Sin esto habría que apuntar por delante del rival en proporción al ping.
 El rebobinado está acotado a 200 ms y se recorta dos veces, así que lo máximo que
 se consigue mintiendo sobre la propia latencia es disparar a un pasado de 200 ms.
 
+**El ángulo de vista lo fija el servidor al reaparecer.** Los ángulos viajan en
+cada comando del cliente, así que girar al jugador en el servidor no basta: el
+siguiente comando, que aún lleva el ángulo anterior, lo desharía en el mismo
+tick. Por eso el snapshot de la reaparición incluye un `viewYaw` que el cliente
+aplica a su entrada. Sin él, al cambiar de lado entre rondas ambos jugadores
+aparecían mirando fuera del mapa.
+
 **El servidor no se fía de nada.** Valida cada mensaje antes de tocar la física
 (rechaza `NaN`, `dt` inflados, secuencias repetidas y bits de botón inventados),
 limita cuántos comandos procesa por tick para que recuperar un retraso no se

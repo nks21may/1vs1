@@ -67,6 +67,11 @@ interface Participant {
   interpMs: number;
   /** Indice del punto de aparicion, alternado cada ronda. */
   spawnSlot: number;
+  /**
+   * Angulo que el cliente debe adoptar en el proximo snapshot, o `null`.
+   * Se llena al reaparecer y se vacia en cuanto se envia.
+   */
+  pendingViewYaw: number | null;
 }
 
 export class MatchSession {
@@ -125,6 +130,7 @@ export class MatchSession {
       latencyMs: 0,
       interpMs: INTERP_DELAY_MS,
       spawnSlot: slot,
+      pendingViewYaw: spawn.yaw,
     });
 
     connection.send({
@@ -372,6 +378,9 @@ export class MatchSession {
         yaw: spawn.yaw,
         pitch: 0,
       };
+      // Girar al jugador en el servidor no basta: el proximo comando del cliente
+      // trae el angulo anterior y lo deshace. Hay que pedirle el giro.
+      participant.pendingViewYaw = spawn.yaw;
     }
   }
 
@@ -422,7 +431,10 @@ export class MatchSession {
     const players = this.players().map((p) => this.snapshotOf(p));
 
     for (const participant of this.participants.values()) {
-      if (participant.connection.isBot) continue;
+      if (participant.connection.isBot) {
+        participant.pendingViewYaw = null;
+        continue;
+      }
 
       // Cada cliente recibe marcados como `local` los disparos que ya predijo,
       // para no dibujar dos veces el mismo trazador.
@@ -434,6 +446,9 @@ export class MatchSession {
 
       participant.connection.send({
         t: 'snapshot',
+        ...(participant.pendingViewYaw === null
+          ? {}
+          : { viewYaw: participant.pendingViewYaw }),
         tick: this.tick,
         time: round2(this.timeMs),
         ack: participant.lastProcessedSeq,
@@ -443,6 +458,7 @@ export class MatchSession {
         round: this.match.round,
         events,
       });
+      participant.pendingViewYaw = null;
     }
   }
 }

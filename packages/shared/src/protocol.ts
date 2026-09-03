@@ -131,6 +131,16 @@ export type GameEvent =
 
 export interface SnapshotMessage {
   t: 'snapshot';
+  /**
+   * Angulo de vista que este cliente debe adoptar de golpe, en grados.
+   *
+   * Los angulos los manda el cliente en cada comando, asi que el servidor no
+   * puede limitarse a girar al jugador al reaparecer: los comandos en vuelo,
+   * que todavia llevan el angulo viejo, lo pisarian en el mismo tick. Con este
+   * campo el servidor pide explicitamente el giro y el cliente lo aplica a su
+   * entrada, que es quien manda. Solo viaja en el tick de la reaparicion.
+   */
+  viewYaw?: number;
   tick: number;
   /** Reloj del servidor en ms, usado para la interpolacion del cliente. */
   time: number;

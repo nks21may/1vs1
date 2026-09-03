@@ -373,6 +373,15 @@ export class Game {
     }
 
     this.handleEvents(message);
+
+    // El servidor pide un giro (reaparicion o cambio de lado). Se aplica a la
+    // entrada, que es la fuente del angulo: tocar solo al jugador predicho lo
+    // desharia el siguiente comando.
+    if (message.viewYaw !== undefined) {
+      this.input.setView(message.viewYaw, 0);
+      this.punchYaw = 0;
+      this.punchPitch = 0;
+    }
   }
 
   private initialisePrediction(self: PlayerSnapshot): void {
@@ -477,7 +486,6 @@ export class Game {
       // Reaparecer descarta la prediccion pendiente: el estado nuevo lo fija el
       // servidor, y arrastrar comandos de la ronda anterior daria un tiron.
       this.prediction.reset(self);
-      this.input.setView(self.yaw, 0);
       this.sequence += 1;
     }
     this.punchPitch = 0;

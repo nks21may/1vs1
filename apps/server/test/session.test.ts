@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  ATRIUM,
   BUTTON,
   DEFAULT_MATCH_CONFIG,
   MAX_COMMANDS_PER_TICK,
@@ -16,6 +17,9 @@ import {
   SNAPSHOT_FLAG,
   TICK_DT,
   type UserCommand,
+  createCollisionWorld,
+  createMoveState,
+  moveStep,
   vec3,
 } from '@neonduel/shared';
 
@@ -416,5 +420,90 @@ describe('contenido del snapshot', () => {
     const me = a.last('snapshot')!.players.find((p) => p.id === 1)!;
     expect(me.reload).toBeGreaterThan(0);
     expect(me.reload).toBeLessThan(1);
+  });
+});
+
+describe('angulo de vista al reaparecer', () => {
+  /**
+   * El bug que estos tests fijan: los angulos los manda el cliente en cada
+   * comando, asi que girar al jugador en el servidor al cambiar de lado no
+   * sirve de nada -- el siguiente comando, que todavia lleva el angulo de la
+   * ronda anterior, lo deshace. El jugador acababa mirando fuera del mapa.
+   */
+
+  /** Angulos de spawn del mapa, que apuntan hacia el centro de la arena. */
+  const spawnYaws = () => ATRIUM.spawns.map((s) => s.yaw);
+
+  it('el primer snapshot ya pide el angulo del spawn inicial', () => {
+    const { session, a, b } = newSession();
+    ticks(session, 1);
+
+    expect(a.all('snapshot')[0]!.viewYaw).toBe(ATRIUM.spawns[0]!.yaw);
+    expect(b.all('snapshot')[0]!.viewYaw).toBe(ATRIUM.spawns[1]!.yaw);
+  });
+
+  it('al cambiar de lado cada cliente recibe el angulo de su nuevo spawn', () => {
+    const { session, a, b } = newSession();
+    goLive(session);
+
+    const yawA = a.all('snapshot').filter((s) => s.viewYaw !== undefined).at(-1)!.viewYaw;
+    const yawB = b.all('snapshot').filter((s) => s.viewYaw !== undefined).at(-1)!.viewYaw;
+
+    // Los dos han cambiado de lado, asi que miran en sentidos opuestos.
+    expect(yawA).not.toBe(yawB);
+    expect(spawnYaws()).toContain(yawA);
+    expect(spawnYaws()).toContain(yawB);
+
+    // Y cada uno es el angulo del spawn donde el servidor le ha puesto.
+    const posA = a.last('snapshot')!.players.find((p) => p.id === 1)!;
+    const spawnA = ATRIUM.spawns.find((s) => Math.abs(s.pos.x - posA.x) < 1)!;
+    expect(yawA).toBe(spawnA.yaw);
+  });
+
+  it('el angulo se pide una sola vez, no en cada tick', () => {
+    const { session, a } = newSession();
+    goLive(session);
+    const antes = a.all('snapshot').filter((s) => s.viewYaw !== undefined).length;
+
+    ticks(session, 60);
+
+    expect(a.all('snapshot').filter((s) => s.viewYaw !== undefined).length).toBe(antes);
+  });
+
+  it('el angulo pedido corresponde al spawn actual aunque el cliente mande el viejo', () => {
+    const { session, a } = newSession();
+    const inicial = ATRIUM.spawns[0]!.yaw;
+    goLive(session);
+
+    // El cliente aun no se ha enterado del cambio de lado y sigue mandando el
+    // angulo de la ronda anterior: es justo lo que rompia el giro.
+    session.handleMessage(1, input([cmd(1, 0, inicial)]));
+    ticks(session, 5);
+
+    const me = a.last('snapshot')!.players.find((p) => p.id === 1)!;
+    const spawnActual = ATRIUM.spawns.find((s) => Math.abs(s.pos.x - me.x) < 1)!;
+    const pedido = a.all('snapshot').filter((s) => s.viewYaw !== undefined).at(-1)!.viewYaw;
+
+    expect(pedido).toBe(spawnActual.yaw);
+  });
+
+  it('el angulo pedido mira hacia el centro de la arena', () => {
+    for (const spawn of ATRIUM.spawns) {
+      const world = createCollisionWorld(ATRIUM);
+      const state = createMoveState(spawn.pos, spawn.yaw);
+      const distanciaInicial = Math.abs(state.pos.x);
+
+      for (let i = 0; i < 64; i++) {
+        moveStep(
+          state,
+          { seq: i, buttons: BUTTON.FORWARD, yaw: spawn.yaw, pitch: 0, dt: TICK_DT },
+          world,
+        );
+      }
+
+      // Avanzar mirando al angulo del spawn acerca al centro del mapa: es lo
+      // que garantiza que el jugador aparece mirando al combate y no a la pared.
+      expect(Math.abs(state.pos.x)).toBeLessThan(distanciaInicial);
+    }
   });
 });
