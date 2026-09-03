@@ -96,6 +96,32 @@ así se pudra.
   - Hecho cuando: se ha escuchado una ráfaga completa y un disparo suelto en
     altavoces y en auriculares, y la pistola y el rifle siguen siendo
     distinguibles sin mirar el HUD.
+  - **Implementado y medido (2026-09-03), pendiente del oído.** El disparo pasa a
+    cuatro capas por un paso bajo que cae (sub, cuerpo de sierra, chasquido y
+    cola), con el suelo del barrido atado al brillo del arma. Rifle: cuerpo a
+    82 Hz, sub a 48 Hz, chasquido a 1400 Hz. Medido en Chrome renderizando cada
+    disparo con `OfflineAudioContext` (banco: `audio-preview.html`), ocho
+    disparos por arma:
+    | | rifle antes | rifle ahora | pistola antes | pistola ahora |
+    |---|---|---|---|---|
+    | centroide espectral | 1478 Hz | 521 Hz | 1701 Hz | 708 Hz |
+    | energía en 20-60 Hz | 0,5% | 29,2% | 0% | 9,1% |
+    | energía por encima de 160 Hz | 39% | 46% | 79% | 47% |
+    | cola audible | 249 ms | 442 ms | 170 ms | 189 ms |
+    | pico (volumen al máximo) | 0,89 | 0,72 | 0,78 | 0,60 |
+    | pico de la ráfaga a cadencia real | 1,03 (satura) | 0,90 | 0,79 | 0,81 |
+    La energía por encima de 160 Hz **sube** en el rifle (39% → 46%), que es el
+    seguro contra pasarse de graves: aunque un portátil se coma el sub entero,
+    queda más disparo que antes. De paso, la ráfaga del rifle ya no satura.
+  - **Ojo con esto:** la correlación media entre disparos sube de 0,28 a 0,50
+    (media de los 28 pares). Es inherente a que ahora manda una capa tonal grave
+    y no el ruido; se ha compensado ampliando el detune a ±8% y variando también
+    el peso del sub, pero si al escucharlo una ráfaga suena a copia y pega, ahí
+    está la causa.
+  - **Falta la escucha en altavoces y en auriculares**, que es el criterio de
+    arriba y no se puede cerrar desde aquí. Los WAV de las dos versiones
+    (suelto y ráfaga a la cadencia real de cada arma) salen del banco con
+    `audio-preview.html`.
 
 - [ ] **T01. Pasos audibles del rival**
   Hoy solo se oyen los pasos propios: el rival se mueve en silencio absoluto, y en

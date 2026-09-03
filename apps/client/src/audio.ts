@@ -74,10 +74,18 @@ export class AudioEngine {
     const now = ctx.currentTime;
     switch (name) {
       case 'rifle':
-        this.gunshot(gain, now, { body: 150, crack: 2400, duration: 0.24, level: 0.55 });
+        this.gunshot(gain, now, {
+          sub: 48, body: 82, crack: 1400, duration: 0.34, level: 0.46, punch: 0.42, weight: 1,
+          tail: 1.6,
+        });
         break;
       case 'pistol':
-        this.gunshot(gain, now, { body: 260, crack: 3200, duration: 0.16, level: 0.42 });
+        // Mas seca que el rifle: apenas sub, cuerpo mas alto y cola corta. No es
+        // el mismo disparo mas agudo, es otro golpe.
+        this.gunshot(gain, now, {
+          sub: 70, body: 200, crack: 2000, duration: 0.19, level: 0.64, punch: 0.2, weight: 0.5,
+          tail: 0.9,
+        });
         break;
       case 'impact':
         this.noise(gain, now, { duration: 0.09, frequency: 1800, q: 2, level: 0.3 });
@@ -120,39 +128,92 @@ export class AudioEngine {
     }
   }
 
-  /** Disparo: cuerpo grave percusivo mas el chasquido agudo de la boca. */
+  /**
+   * Disparo: golpe sub-grave, cuerpo percusivo, chasquido de boca y cola, todo
+   * por un paso bajo cuya frecuencia cae. Ese barrido descendente es lo que da
+   * la sensacion de aire desplazado: sin el queda un chasquido pelado.
+   */
   private gunshot(
     destination: GainNode,
     now: number,
-    options: { body: number; crack: number; duration: number; level: number },
+    options: {
+      sub: number;
+      body: number;
+      crack: number;
+      duration: number;
+      level: number;
+      /** Peso del sub: junto a `weight`, lo que separa al rifle de la pistola. */
+      punch: number;
+      /** Peso del cuerpo. Bajarlo seca el disparo y deja mandar al chasquido. */
+      weight: number;
+      /** Cuanto se alarga la cola respecto a la duracion del cuerpo. */
+      tail: number;
+    },
   ): void {
     const ctx = this.context!;
+    // Variacion aleatoria por disparo: una rafaga no suena a copia y pega.
+    const detune = 0.92 + Math.random() * 0.16;
 
+    const bus = ctx.createBiquadFilter();
+    bus.type = 'lowpass';
+    bus.frequency.setValueAtTime(7200, now);
+    bus.frequency.exponentialRampToValueAtTime(options.crack * 0.62, now + options.duration);
+    bus.connect(destination);
+
+    // 1. Sub: el golpe en el pecho. Corto a proposito, porque alargarlo
+    //    emborrona la rafaga entera en cuanto se disparan tres seguidos.
+    const sub = ctx.createOscillator();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(options.sub * detune, now);
+    sub.frequency.exponentialRampToValueAtTime(options.sub * 0.62, now + 0.09);
+    const subGain = ctx.createGain();
+    // El sub es la capa mas tonal y la que mas se delata al repetirse, asi que
+    // su peso tambien varia y no solo su afinacion.
+    const punch = options.punch * (0.8 + Math.random() * 0.4);
+    subGain.gain.setValueAtTime(options.level * punch, now);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+    sub.connect(subGain).connect(bus);
+    sub.start(now);
+    sub.stop(now + 0.13);
+
+    // 2. Cuerpo. Diente de sierra y no seno a proposito: sus armonicos son los
+    //    que hacen que el disparo se siga leyendo en un portatil, donde el sub
+    //    no existe. Si esto fuera un seno, con altavoces pequenos no quedaria
+    //    casi nada del disparo.
     const body = ctx.createOscillator();
     body.type = 'sawtooth';
-    // Variacion aleatoria por disparo: una rafaga no suena a copia y pega.
-    const detune = 0.94 + Math.random() * 0.12;
     body.frequency.setValueAtTime(options.body * detune, now);
-    body.frequency.exponentialRampToValueAtTime(options.body * 0.35, now + options.duration);
-
+    body.frequency.exponentialRampToValueAtTime(options.body * 0.4, now + options.duration * 0.6);
     const bodyGain = ctx.createGain();
-    bodyGain.gain.setValueAtTime(options.level, now);
-    bodyGain.gain.exponentialRampToValueAtTime(0.001, now + options.duration);
-    body.connect(bodyGain).connect(destination);
+    bodyGain.gain.setValueAtTime(options.level * options.weight, now);
+    bodyGain.gain.exponentialRampToValueAtTime(0.001, now + options.duration * 0.8);
+    body.connect(bodyGain).connect(bus);
     body.start(now);
-    body.stop(now + options.duration + 0.02);
+    body.stop(now + options.duration);
 
-    this.noise(destination, now, {
-      duration: options.duration * 0.6,
+    // 3. Chasquido de la boca. Acompana al golpe en lugar de mandar: en cuanto
+    //    sube por encima del cuerpo, el disparo suena fino por muy grave que
+    //    sea todo lo demas.
+    this.noise(bus, now, {
+      duration: options.duration * 0.5,
       frequency: options.crack * detune,
-      q: 0.8,
-      level: options.level * 0.9,
+      q: 0.7,
+      level: options.level * 0.78,
       highpass: true,
+    });
+
+    // 4. Cola: el eco del disparo alejandose. Muy por debajo del resto; lo que
+    //    aporta es duracion, no volumen.
+    this.noise(bus, now + 0.01, {
+      duration: options.duration * options.tail,
+      frequency: options.crack * 0.38,
+      q: 0.6,
+      level: options.level * 0.26,
     });
   }
 
   private noise(
-    destination: GainNode,
+    destination: AudioNode,
     now: number,
     options: {
       duration: number;
