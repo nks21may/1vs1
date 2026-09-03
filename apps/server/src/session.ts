@@ -15,6 +15,7 @@ import {
   DEFAULT_MATCH_CONFIG,
   type GameEvent,
   type GameMap,
+  type FootstepTracker,
   INPUT_BUFFER_SIZE,
   INTERP_DELAY_MS,
   LagCompensationBuffer,
@@ -29,13 +30,16 @@ import {
   TICK_DT,
   TICK_RATE,
   type UserCommand,
+  advanceFootstep,
   applyDamage,
   applyPhaseRestrictions,
   computeDamage,
   computeRewindTime,
   createCollisionWorld,
+  createFootstepTracker,
   createPlayer,
   getWeapon,
+  length2D,
   respawnPlayer,
   round2,
   shotDirection,
@@ -72,6 +76,8 @@ interface Participant {
    * Se llena al reaparecer y se vacia en cuanto se envia.
    */
   pendingViewYaw: number | null;
+  /** Zancada acumulada, para saber cuando toca que suene una pisada. */
+  footsteps: FootstepTracker;
 }
 
 export class MatchSession {
@@ -131,6 +137,7 @@ export class MatchSession {
       interpMs: INTERP_DELAY_MS,
       spawnSlot: slot,
       pendingViewYaw: spawn.yaw,
+      footsteps: createFootstepTracker(),
     });
 
     connection.send({
@@ -242,6 +249,20 @@ export class MatchSession {
           t: 'land',
           id: player.id,
           speed: round2(events.landingSpeed),
+        });
+      }
+      // Los pasos van por distancia recorrida, no por tiempo: asi la cadencia
+      // sale sola de la velocidad y andar o agacharse no suenan.
+      if (
+        player.alive &&
+        advanceFootstep(participant.footsteps, length2D(player.vel), player.onGround, cmd.dt)
+      ) {
+        this.pendingEvents.push({
+          t: 'step',
+          id: player.id,
+          x: round2(player.pos.x),
+          y: round2(player.pos.y),
+          z: round2(player.pos.z),
         });
       }
       if (events.startedReload) this.pendingEvents.push({ t: 'reload', id: player.id });

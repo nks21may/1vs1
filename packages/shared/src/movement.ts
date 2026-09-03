@@ -18,6 +18,8 @@ import {
   DUCK_TRANSITION_TIME,
   EYE_HEIGHT_DUCKED,
   EYE_HEIGHT_STANDING,
+  FOOTSTEP_MIN_SPEED,
+  FOOTSTEP_STRIDE,
   FRICTION,
   GRAVITY,
   JUMP_IMPULSE,
@@ -461,3 +463,36 @@ export const createMoveState = (pos: Vec3, yaw = 0): MoveState => ({
   duckProgress: 0,
   jumpHeld: false,
 });
+
+/**
+ * Contador de zancada. Vive fuera del `PlayerState` a proposito: no forma parte
+ * del estado que se rebobina para compensar latencia, porque un paso ya sonado
+ * no se puede "des-sonar".
+ */
+export interface FootstepTracker {
+  distance: number;
+}
+
+export const createFootstepTracker = (): FootstepTracker => ({ distance: 0 });
+
+/**
+ * Avanza el contador y dice si suena una pisada en este paso de simulacion.
+ *
+ * El acumulador no se reinicia al bajar del umbral, y eso es deliberado: si se
+ * reiniciase, avanzar a tirones cortos seria una forma gratuita de cruzar el
+ * mapa en silencio. Asi, el ruido acaba saliendo igual.
+ */
+export const advanceFootstep = (
+  tracker: FootstepTracker,
+  speed: number,
+  onGround: boolean,
+  dt: number,
+): boolean => {
+  if (!onGround || speed < FOOTSTEP_MIN_SPEED) return false;
+
+  tracker.distance += speed * dt;
+  if (tracker.distance < FOOTSTEP_STRIDE) return false;
+
+  tracker.distance -= FOOTSTEP_STRIDE;
+  return true;
+};

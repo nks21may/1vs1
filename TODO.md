@@ -123,7 +123,7 @@ así se pudra.
     (suelto y ráfaga a la cadencia real de cada arma) salen del banco con
     `audio-preview.html`.
 
-- [ ] **T01. Pasos audibles del rival**
+- [x] **T01. Pasos audibles del rival**
   Hoy solo se oyen los pasos propios: el rival se mueve en silencio absoluto, y en
   un juego de duelos el sonido *es* información. El evento `step` ya está definido
   en el protocolo pero no lo emite nadie (código muerto que esta tarea resuelve).
@@ -134,6 +134,24 @@ así se pudra.
     lo que hace útil andar despacio.
   - Hecho cuando: hay test de que correr genera pasos a ritmo constante, que
     agacharse o andar no los genera, y que un jugador quieto tampoco.
+  - **Hecho (2026-09-03).** La regla vive en `advanceFootstep`
+    ([movement.ts](packages/shared/src/movement.ts)) y la usan los dos lados: el
+    servidor la emite para todo el mundo y el cliente la predice para los pasos
+    propios, porque oir el propio paso con un RTT de retraso se nota. Va por
+    **distancia recorrida y no por tiempo**, asi que la cadencia sale sola de la
+    velocidad sin ninguna formula aparte.
+  - El umbral (`FOOTSTEP_MIN_SPEED`) se define desde `WALK_SPEED_MULTIPLIER` y no
+    como numero suelto: andar tiene que ser silencioso siempre, asi que si se
+    retoca lo que corre alguien andando, el umbral lo sigue. De paso arregla que
+    el jugador se oyera a si mismo al andar (el cliente usaba un umbral de 100,
+    por debajo de los 130 de andar).
+  - La zancada **no se reinicia al pararse**, a proposito: si se reiniciase,
+    avanzar a tirones cortos seria una forma gratuita de cruzar el mapa en
+    silencio. Hay test de eso.
+  - Verificado ademas en Chrome contra el servidor real: en 30 s de partida
+    contra el bot llegan 33 eventos `step` del rival, sin errores de consola. El
+    bot corre por encima del umbral en el 51% de las instantaneas y su punta es
+    de 216 u/s, que cuadra con las ~40 zancadas teoricas.
 
 - [ ] **T02. Sonido posicional real**
   El audio solo atenúa por distancia ([audio.ts](apps/client/src/audio.ts)): un

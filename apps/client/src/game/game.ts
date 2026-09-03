@@ -18,8 +18,10 @@ import {
   TICK_DT,
   type UserCommand,
   type Vec3,
+  advanceFootstep,
   applyPhaseRestrictions,
   computeSpread,
+  createFootstepTracker,
   createPlayer,
   eyePosition,
   getRecoil,
@@ -43,10 +45,6 @@ import { InputManager } from './input.js';
 import { NetClient, type ConnectionStatus, buildServerUrl } from './net.js';
 import { PredictionSystem } from './prediction.js';
 import type { Settings } from './settings.js';
-
-/** Umbral de velocidad a partir del cual suenan pasos. */
-const FOOTSTEP_SPEED = 100;
-const FOOTSTEP_INTERVAL = 0.38;
 
 export interface GameCallbacks {
   onStatus(status: ConnectionStatus, detail?: string): void;
@@ -86,7 +84,7 @@ export class Game {
   private punchYaw = 0;
   private lastYaw = 0;
   private lastPitch = 0;
-  private footstepTimer = 0;
+  private readonly footsteps = createFootstepTracker();
   private fps = 60;
   private settings: Settings;
 
@@ -264,19 +262,18 @@ export class Game {
     return vec3(origin.x + dir.x * 24, origin.y + dir.y * 24, origin.z + dir.z * 24 - 4);
   }
 
+  /**
+   * Pasos propios. Se predicen en lugar de esperar al evento del servidor,
+   * porque oir el propio paso con un viaje de ida y vuelta de retraso se nota
+   * enseguida. Usa la misma regla que el servidor, asi que suenan cuando el
+   * servidor los emite para los demas.
+   */
   private updateFootsteps(dt: number): void {
     const prediction = this.prediction;
     if (!prediction || !prediction.player.alive) return;
 
-    const speed = length2D(prediction.player.vel);
-    if (!prediction.player.onGround || speed < FOOTSTEP_SPEED) {
-      this.footstepTimer = FOOTSTEP_INTERVAL * 0.5;
-      return;
-    }
-
-    this.footstepTimer -= dt * (speed / 250);
-    if (this.footstepTimer <= 0) {
-      this.footstepTimer = FOOTSTEP_INTERVAL;
+    const player = prediction.player;
+    if (advanceFootstep(this.footsteps, length2D(player.vel), player.onGround, dt)) {
       this.audio.play('step');
     }
   }
@@ -449,6 +446,14 @@ export class Game {
           if (event.id !== this.localId) this.audio.play('land', this.distanceToPlayer(event.id));
           break;
 
+        case 'step':
+          // Los pasos propios ya se han predicho arriba; este evento es lo que
+          // convierte al rival en algo que se puede oir venir.
+          if (event.id !== this.localId) {
+            this.audio.play('step', this.distanceToPoint(event.x, event.y, event.z));
+          }
+          break;
+
         case 'reload':
           if (event.id !== this.localId) {
             this.audio.play('reload', this.distanceToPlayer(event.id));
@@ -496,6 +501,11 @@ export class Game {
 
   private nameOf(message: SnapshotMessage, id: number): string {
     return message.players.find((p) => p.id === id)?.name ?? 'JUGADOR';
+  }
+
+  private distanceToPoint(x: number, y: number, z: number): number {
+    if (!this.prediction) return 600;
+    return distanceBetween(this.prediction.player.pos, { x, y, z });
   }
 
   private distanceToPlayer(id: number): number {

@@ -8,12 +8,21 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { BUTTON, GRAVITY, JUMP_IMPULSE, MAX_SPEED, TICK_DT } from '../src/constants.js';
+import {
+  BUTTON,
+  FOOTSTEP_MIN_SPEED,
+  GRAVITY,
+  JUMP_IMPULSE,
+  MAX_SPEED,
+  TICK_DT,
+} from '../src/constants.js';
 import { length2D, vec3 } from '../src/math.js';
 import {
   accelerate,
+  advanceFootstep,
   airAccelerate,
   applyFriction,
+  createFootstepTracker,
   createMoveState,
   eyeHeight,
   moveStep,
@@ -315,5 +324,56 @@ describe('determinismo', () => {
     expect(a.pos).toEqual(b.pos);
     expect(a.vel).toEqual(b.vel);
     expect(a.onGround).toBe(b.onGround);
+  });
+});
+
+describe('cadencia de los pasos', () => {
+  /** Ticks en los que suena un paso corriendo a velocidad constante. */
+  const ticksConPaso = (speed: number, count: number, onGround = true) => {
+    const tracker = createFootstepTracker();
+    const heard: number[] = [];
+    for (let i = 0; i < count; i++) {
+      if (advanceFootstep(tracker, speed, onGround, TICK_DT)) heard.push(i);
+    }
+    return heard;
+  };
+
+  const intervalos = (heard: number[]) => heard.slice(1).map((t, i) => t - heard[i]!);
+
+  it('a velocidad constante el ritmo es constante', () => {
+    const heard = ticksConPaso(MAX_SPEED, 300);
+    expect(heard.length).toBeGreaterThan(4);
+
+    const gaps = intervalos(heard);
+    // Un tick de margen: la zancada casi nunca cae justo en el borde del tick.
+    expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThanOrEqual(1);
+  });
+
+  it('cuanto mas rapido, mas seguidos', () => {
+    const lento = intervalos(ticksConPaso(FOOTSTEP_MIN_SPEED * 1.05, 400));
+    const rapido = intervalos(ticksConPaso(MAX_SPEED, 400));
+    expect(Math.min(...lento)).toBeGreaterThan(Math.max(...rapido));
+  });
+
+  it('por debajo del umbral no suena nada', () => {
+    expect(ticksConPaso(FOOTSTEP_MIN_SPEED - 1, 600)).toEqual([]);
+  });
+
+  it('en el aire no suena nada', () => {
+    expect(ticksConPaso(MAX_SPEED, 600, false)).toEqual([]);
+  });
+
+  it('la zancada no se reinicia al pararse', () => {
+    const tracker = createFootstepTracker();
+    let heard = 0;
+    // Tirones cortos, siempre por debajo de una zancada entera: si el contador
+    // se reiniciase al parar, esto seria una forma gratuita de no hacer ruido.
+    for (let burst = 0; burst < 40; burst++) {
+      for (let i = 0; i < 4; i++) {
+        if (advanceFootstep(tracker, MAX_SPEED, true, TICK_DT)) heard++;
+      }
+      for (let i = 0; i < 20; i++) advanceFootstep(tracker, 0, true, TICK_DT);
+    }
+    expect(heard).toBeGreaterThan(0);
   });
 });

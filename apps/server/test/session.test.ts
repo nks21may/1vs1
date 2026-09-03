@@ -507,3 +507,56 @@ describe('angulo de vista al reaparecer', () => {
     }
   });
 });
+
+describe('pasos audibles', () => {
+  /**
+   * Corre `count` ticks con el mismo comando y devuelve en que ticks ha sonado
+   * un paso del jugador 1.
+   */
+  const stepTicks = (session: MatchSession, a: MemoryConnection, buttons: number, count: number) => {
+    const heard: number[] = [];
+    // Con el angulo del spawn: corriendo hacia otro lado se choca con la pared
+    // del fondo y no se llega ni a la velocidad de andar.
+    const yaw = session.playerOf(1)!.yaw;
+    for (let i = 0; i < count; i++) {
+      session.handleMessage(1, input([cmd(i + 1, buttons, yaw)]));
+      session.update();
+      const events = a.last('snapshot')!.events;
+      if (events.some((e) => e.t === 'step' && e.id === 1)) heard.push(i);
+    }
+    return heard;
+  };
+
+  it('correr delata la posicion', () => {
+    const { session, a } = newSession();
+    goLive(session);
+
+    const heard = stepTicks(session, a, BUTTON.FORWARD, 160);
+    expect(heard.length).toBeGreaterThan(1);
+
+    // El evento lleva donde ha sonado, que es lo que hace util oirlo.
+    const paso = a
+      .all('snapshot')
+      .flatMap((snap) => snap.events)
+      .find((e) => e.t === 'step');
+    expect(paso).toMatchObject({ id: 1 });
+  });
+
+  it('andar con Shift no delata', () => {
+    const { session, a } = newSession();
+    goLive(session);
+    expect(stepTicks(session, a, BUTTON.FORWARD | BUTTON.WALK, 200)).toEqual([]);
+  });
+
+  it('agacharse tampoco', () => {
+    const { session, a } = newSession();
+    goLive(session);
+    expect(stepTicks(session, a, BUTTON.FORWARD | BUTTON.DUCK, 200)).toEqual([]);
+  });
+
+  it('quieto no suena', () => {
+    const { session, a } = newSession();
+    goLive(session);
+    expect(stepTicks(session, a, 0, 200)).toEqual([]);
+  });
+});

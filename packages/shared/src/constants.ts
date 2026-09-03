@@ -42,6 +42,22 @@ export const DUCK_TRANSITION_TIME = 0.2;
 export const DUCK_SPEED_MULTIPLIER = 0.34;
 export const WALK_SPEED_MULTIPLIER = 0.52;
 
+/**
+ * Velocidad a partir de la cual un jugador hace ruido al pisar. Se define desde
+ * el multiplicador de andar y no como un numero suelto: andar tiene que ser
+ * silencioso siempre, asi que si algun dia se retoca lo que corre alguien
+ * andando, el umbral lo sigue solo. El 8% de margen es para que rozar el tope
+ * andando no delate.
+ */
+export const FOOTSTEP_MIN_SPEED = MAX_SPEED * WALK_SPEED_MULTIPLIER * 1.08;
+
+/**
+ * Distancia entre dos pisadas. Contar distancia y no tiempo hace que la
+ * cadencia salga sola: cuanto mas rapido va alguien, mas seguidos suenan sus
+ * pasos, sin ninguna formula aparte.
+ */
+export const FOOTSTEP_STRIDE = 84;
+
 // --- Hitboxes (fracciones de la altura actual del jugador) ---
 export const HEAD_HITBOX_BOTTOM = 0.82;
 export const LEGS_HITBOX_TOP = 0.42;
