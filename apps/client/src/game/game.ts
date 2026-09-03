@@ -41,6 +41,11 @@ import { PALETTE, applyViewAngles, createRenderContext, toThree } from '../rende
 import { ViewModel } from '../render/viewmodel.js';
 import { buildWorldMesh } from '../render/world.js';
 import { InterpolationBuffer, type InterpolatedPlayer } from './interpolation.js';
+import {
+  type DeathCamera,
+  createDeathCamera,
+  updateDeathCamera,
+} from './deathcam.js';
 import { InputManager } from './input.js';
 import { NetClient, type ConnectionStatus, buildServerUrl } from './net.js';
 import { PredictionSystem } from './prediction.js';
@@ -85,6 +90,8 @@ export class Game {
   private lastYaw = 0;
   private lastPitch = 0;
   private readonly footsteps = createFootstepTracker();
+  /** Camara de muerte mientras el jugador local esta muerto. */
+  private deathCam: DeathCamera | null = null;
   private fps = 60;
   private settings: Settings;
 
@@ -292,17 +299,33 @@ export class Game {
     }
 
     const player = prediction.player;
-    const eye = eyePosition(player);
-    toThree(eye, this.render.camera.position);
-    applyViewAngles(
-      this.render.camera,
-      player.yaw + this.punchYaw,
-      player.pitch - this.punchPitch,
-    );
+    // Volver a estar vivo la cancela, venga la reaparicion de donde venga.
+    if (this.deathCam && player.alive) this.deathCam = null;
+    const deathCam = this.deathCam;
+    if (deathCam) {
+      // Muerto: la vista deja de ser la del jugador y gira hacia el asesino.
+      const snapshot = this.latestSnapshot;
+      const killer =
+        snapshot && deathCam.killerId !== null
+          ? this.positionOf(snapshot, deathCam.killerId)
+          : null;
+      updateDeathCamera(deathCam, killer ?? null, dt);
+      toThree(deathCam.eye, this.render.camera.position);
+      applyViewAngles(this.render.camera, deathCam.yaw, deathCam.pitch);
+      this.audio.setListener(deathCam.eye, deathCam.yaw, deathCam.pitch);
+    } else {
+      const eye = eyePosition(player);
+      toThree(eye, this.render.camera.position);
+      applyViewAngles(
+        this.render.camera,
+        player.yaw + this.punchYaw,
+        player.pitch - this.punchPitch,
+      );
 
-    // El oyente va con la camara: sin el retroceso, que mueve la vista unos
-    // grados y haria bailar la posicion de los sonidos sin motivo.
-    this.audio.setListener(eye, player.yaw, player.pitch);
+      // El oyente va con la camara: sin el retroceso, que mueve la vista unos
+      // grados y haria bailar la posicion de los sonidos sin motivo.
+      this.audio.setListener(eye, player.yaw, player.pitch);
+    }
 
     const weapon = getWeapon(player.weapon);
     const speed = length2D(player.vel);
@@ -433,6 +456,17 @@ export class Game {
           const killer = event.killer !== null ? this.nameOf(message, event.killer) : 'EL VACIO';
           this.hud.addKill(killer, victim, event.group === 'head');
           if (event.killer === this.localId) this.hud.showHitmarker(true);
+          if (event.victim === this.localId && this.prediction) {
+            // Arranca mirando donde miraba el jugador, para que el giro hacia
+            // el asesino se vea salir de su propia vista y no aparezca de golpe.
+            const self = this.prediction.player;
+            this.deathCam = createDeathCamera(
+              eyePosition(self),
+              self.yaw,
+              self.pitch,
+              event.killer,
+            );
+          }
           // La muerte propia suena plana: es un aviso, no algo que pase en un
           // punto del mapa.
           this.audio.play(
@@ -496,6 +530,8 @@ export class Game {
     }
     this.punchPitch = 0;
     this.punchYaw = 0;
+    // Sin esto la ronda nueva empezaria mirando al asesino de la anterior.
+    this.deathCam = null;
     this.hud.announce(`RONDA ${round}`, 'neutral', 1600);
     this.audio.play('roundStart');
   }

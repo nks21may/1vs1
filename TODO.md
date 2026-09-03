@@ -183,12 +183,29 @@ así se pudra.
     avatar interpolado, y si un jugador ya no está en ella el sonido no se
     reproduce, en vez de sonar plano y a todo volumen.
 
-- [ ] **T03. Cámara de muerte**
+- [x] **T03. Cámara de muerte**
   Al morir la vista se queda congelada donde estaba. Debería girar hacia quien te
   mató y seguirle hasta el fin de la ronda: informa de dónde vino el disparo y
   quita la sensación de corte seco.
   - Hecho cuando: al morir la cámara interpola hacia el asesino y le sigue; si la
     muerte fue por caída, se queda mirando el punto de impacto.
+  - **Hecho (2026-09-03).** La lógica está en
+    [deathcam.ts](apps/client/src/game/deathcam.ts) con 8 tests. La cámara arranca
+    en los ángulos que tenía el jugador al morir, para que el giro se vea salir de
+    su propia vista, sube 28 unidades sobre el cuerpo y apunta al pecho del
+    asesino (a los pies dejaría la cámara mirando al suelo cuando está cerca).
+  - El suavizado es exponencial (`1 - e^(-k·dt)`) y no un paso lineal: así el giro
+    tarda lo mismo a 30 que a 240 fps **y no se pasa nunca de largo**, ni siquiera
+    con el `dt` enorme que devuelve una pestaña que estaba en segundo plano. Hay
+    test de las dos cosas.
+  - Sin asesino (una caída) mira al punto de impacto, que queda justo debajo: la
+    cámara acaba mirando a plomo hacia el cuerpo.
+  - Se cancela al volver a estar vivo, no solo al empezar la ronda, para que
+    cualquier otra forma de reaparecer no deje la vista clavada en el asesino.
+  - Verificado en partida real contra el bot difícil: muerte en (1056, 0, 96) con
+    el asesino en (480, -333, 0); a los 0,08 s el bot está abajo a la izquierda de
+    la mira y a los 0,7 s ya está centrado. En la ronda siguiente la vista vuelve
+    a ser la del jugador. Sin errores de consola.
 
 - [ ] **T04. Marcador y resumen de partida**
   No hay forma de ver el estado más allá de los dos números de arriba. Falta un
