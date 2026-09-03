@@ -300,6 +300,10 @@ export class Game {
       player.pitch - this.punchPitch,
     );
 
+    // El oyente va con la camara: sin el retroceso, que mueve la vista unos
+    // grados y haria bailar la posicion de los sonidos sin motivo.
+    this.audio.setListener(eye, player.yaw, player.pitch);
+
     const weapon = getWeapon(player.weapon);
     const speed = length2D(player.vel);
     const maxSpeed = maxSpeedFor(0, player.ducking, weapon.speedMultiplier);
@@ -391,8 +395,6 @@ export class Game {
   }
 
   private handleEvents(message: SnapshotMessage): void {
-    const localPos = this.prediction ? eyePosition(this.prediction.player) : vec3();
-
     for (const event of message.events) {
       switch (event.t) {
         case 'shot': {
@@ -402,10 +404,7 @@ export class Game {
           const to = vec3(event.ex, event.ey, event.ez);
           const weapon = getWeapon(event.weapon);
           this.effects.addTracer(from, to, weapon.tracerColor);
-          this.audio.play(
-            event.weapon === 'rifle' ? 'rifle' : 'pistol',
-            distanceBetween(localPos, from),
-          );
+          this.audio.play(event.weapon === 'rifle' ? 'rifle' : 'pistol', from);
           break;
         }
 
@@ -434,29 +433,31 @@ export class Game {
           const killer = event.killer !== null ? this.nameOf(message, event.killer) : 'EL VACIO';
           this.hud.addKill(killer, victim, event.group === 'head');
           if (event.killer === this.localId) this.hud.showHitmarker(true);
-          this.audio.play('death', event.victim === this.localId ? 0 : 400);
+          // La muerte propia suena plana: es un aviso, no algo que pase en un
+          // punto del mapa.
+          this.audio.play(
+            'death',
+            event.victim === this.localId ? undefined : this.positionOf(message, event.victim),
+          );
           break;
         }
 
         case 'jump':
-          if (event.id !== this.localId) this.audio.play('jump', this.distanceToPlayer(event.id));
-          break;
-
         case 'land':
-          if (event.id !== this.localId) this.audio.play('land', this.distanceToPlayer(event.id));
+        case 'reload': {
+          if (event.id === this.localId) break;
+          // Sin posicion no se reproduce: sonaria plano y a todo volumen, que
+          // enganaria mas que el silencio.
+          const at = this.positionOf(message, event.id);
+          if (at) this.audio.play(event.t, at);
           break;
+        }
 
         case 'step':
           // Los pasos propios ya se han predicho arriba; este evento es lo que
           // convierte al rival en algo que se puede oir venir.
           if (event.id !== this.localId) {
-            this.audio.play('step', this.distanceToPoint(event.x, event.y, event.z));
-          }
-          break;
-
-        case 'reload':
-          if (event.id !== this.localId) {
-            this.audio.play('reload', this.distanceToPlayer(event.id));
+            this.audio.play('step', vec3(event.x, event.y, event.z));
           }
           break;
 
@@ -503,18 +504,15 @@ export class Game {
     return message.players.find((p) => p.id === id)?.name ?? 'JUGADOR';
   }
 
-  private distanceToPoint(x: number, y: number, z: number): number {
-    if (!this.prediction) return 600;
-    return distanceBetween(this.prediction.player.pos, { x, y, z });
-  }
-
-  private distanceToPlayer(id: number): number {
-    const player = this.remotePlayers.find((p) => p.id === id);
-    if (!player || !this.prediction) return 600;
-    return distanceBetween(this.prediction.player.pos, player.pos);
+  /**
+   * Donde esta un jugador segun la instantanea, o `undefined` si ya no esta en
+   * la partida. Se usa la instantanea y no el avatar interpolado porque es la
+   * posicion que el servidor da por buena para ese evento.
+   */
+  private positionOf(message: SnapshotMessage, id: number): Vec3 | undefined {
+    const player = message.players.find((p) => p.id === id);
+    return player ? vec3(player.x, player.y, player.z) : undefined;
   }
 
 }
 
-const distanceBetween = (a: Vec3, b: Vec3): number =>
-  Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);

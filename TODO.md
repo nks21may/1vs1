@@ -153,7 +153,7 @@ así se pudra.
     bot corre por encima del umbral en el 51% de las instantaneas y su punta es
     de 216 u/s, que cuadra con las ~40 zancadas teoricas.
 
-- [ ] **T02. Sonido posicional real**
+- [x] **T02. Sonido posicional real**
   El audio solo atenúa por distancia ([audio.ts](apps/client/src/audio.ts)): un
   disparo a la espalda suena igual que uno de frente. Con `PannerNode` (HRTF) y la
   orientación de la cámara se sabría de dónde viene, que junto a T01 es la mitad
@@ -161,6 +161,27 @@ así se pudra.
   - Hecho cuando: los sonidos con posición se emiten por un `PannerNode` orientado
     con la vista del jugador, y hay un test de la conversión de coordenadas del
     juego (Z-up) a las del listener de WebAudio (Y-up).
+  - **Hecho (2026-09-03).** `play(name, at?)` pasa a recibir la posición del mundo
+    en vez de una distancia ya calculada; con posición va por un `PannerNode` con
+    HRTF, y sin ella suena plano (avisos, arma propia, muerte propia). El oyente
+    se coloca cada fotograma con la cámara, **sin el retroceso**: mover la vista
+    unos grados al disparar no debe hacer bailar los sonidos.
+  - La atenuación por distancia **sigue siendo la de siempre** (`1/(1+d/900)`, en
+    su nodo de ganancia) y el panner va con `rolloffFactor` a 0. Así añadir
+    dirección no cambia de paso el equilibrio de volúmenes ya ajustado.
+  - La conversión Z-arriba → Y-arriba vive en
+    [spatial.ts](apps/client/src/spatial.ts) con 9 tests, incluido uno de que la
+    conversión **no invierte la mano**: es un giro, no una reflexión, que es lo
+    que evita el fallo de que un disparo por la izquierda suene por la derecha.
+  - Comprobado en Chrome renderizando en estéreo con `OfflineAudioContext`: una
+    fuente a la izquierda del jugador da 0,0283 de RMS en el canal izquierdo
+    frente a 0,0196 en el derecho, a la derecha se invierte, de frente queda
+    centrada, y **el mismo punto del mundo cambia de oído al girarse 180º**. Un
+    sonido a la espalda sale un 26% más flojo que de frente, que es la
+    diferencia delante/detrás que da el HRTF.
+  - De paso: las posiciones de los eventos se sacan de la instantánea y no del
+    avatar interpolado, y si un jugador ya no está en ella el sonido no se
+    reproduce, en vez de sonar plano y a todo volumen.
 
 - [ ] **T03. Cámara de muerte**
   Al morir la vista se queda congelada donde estaba. Debería girar hacia quien te

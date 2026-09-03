@@ -9,6 +9,24 @@
  * navegadores; hasta entonces todas las llamadas son inocuas.
  */
 
+import { type Vec3, vec3 } from '@neonduel/shared';
+
+import { listenerVectors, toAudioCoords } from './spatial.js';
+
+/** Coloca un nodo espacial, por los dos caminos que existen segun navegador. */
+const setNodePosition = (node: PannerNode, v: Vec3): void => {
+  if (node.positionX) {
+    node.positionX.value = v.x;
+    node.positionY.value = v.y;
+    node.positionZ.value = v.z;
+    return;
+  }
+  node.setPosition?.(v.x, v.y, v.z);
+};
+
+const distanceBetween = (a: Vec3, b: Vec3): number =>
+  Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+
 export type SoundName =
   | 'rifle'
   | 'pistol'
@@ -29,6 +47,8 @@ export class AudioEngine {
   private master: GainNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
   private volume = 0.6;
+  /** Ultima posicion del oyente, para medir la distancia de cada sonido. */
+  private listenerPos: Vec3 = vec3();
 
   /** Crea el contexto. Debe llamarse desde un gesto del usuario. */
   init(): void {
@@ -58,18 +78,66 @@ export class AudioEngine {
   }
 
   /**
-   * Reproduce un sonido. `distance` atenua segun lo lejos que ocurra, en
-   * unidades del juego: un disparo al otro lado del mapa debe oirse debil.
+   * Coloca y orienta al oyente. Sin esto el `PannerNode` situaria todos los
+   * sonidos respecto a un oyente en el origen mirando a -Z, y girarse no
+   * cambiaria de que lado suenan las cosas.
    */
-  play(name: SoundName, distance = 0): void {
+  setListener(position: Vec3, yawDeg: number, pitchDeg: number): void {
+    const ctx = this.context;
+    if (!ctx) return;
+
+    this.listenerPos = position;
+    const pos = toAudioCoords(position);
+    const { forward, up } = listenerVectors(yawDeg, pitchDeg);
+    const listener = ctx.listener;
+
+    // Los navegadores viejos solo tienen los metodos, y los nuevos solo los
+    // AudioParam; hay que soportar los dos caminos.
+    if (listener.positionX) {
+      listener.positionX.value = pos.x;
+      listener.positionY.value = pos.y;
+      listener.positionZ.value = pos.z;
+      listener.forwardX.value = forward.x;
+      listener.forwardY.value = forward.y;
+      listener.forwardZ.value = forward.z;
+      listener.upX.value = up.x;
+      listener.upY.value = up.y;
+      listener.upZ.value = up.z;
+      return;
+    }
+    listener.setPosition?.(pos.x, pos.y, pos.z);
+    listener.setOrientation?.(forward.x, forward.y, forward.z, up.x, up.y, up.z);
+  }
+
+  /**
+   * Reproduce un sonido. Si se le da una posicion del mundo, suena situado ahi:
+   * atenuado por la distancia y, sobre todo, viniendo de su lado. Sin posicion
+   * suena plano, que es lo que quieren los avisos y el arma propia.
+   */
+  play(name: SoundName, at?: Vec3): void {
     const ctx = this.context;
     const master = this.master;
     if (!ctx || !master) return;
 
     const gain = ctx.createGain();
     // Atenuacion suave: audible en todo el mapa, pero claramente lejano.
+    const distance = at ? distanceBetween(this.listenerPos, at) : 0;
     gain.gain.value = 1 / (1 + distance / 900);
-    gain.connect(master);
+
+    if (at) {
+      const panner = ctx.createPanner();
+      panner.panningModel = 'HRTF';
+      // El panner solo situa; la atenuacion por distancia la sigue haciendo el
+      // gain de arriba con la curva de siempre. Con `rolloffFactor` a cero el
+      // panner no toca el volumen, asi que anadir direccion no cambia de paso
+      // el equilibrio de volumenes que ya estaba ajustado.
+      panner.distanceModel = 'inverse';
+      panner.rolloffFactor = 0;
+      setNodePosition(panner, toAudioCoords(at));
+      gain.connect(panner).connect(master);
+    } else {
+      gain.connect(master);
+    }
 
     const now = ctx.currentTime;
     switch (name) {
