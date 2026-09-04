@@ -29,6 +29,12 @@ export const cmd = (
   dt = TICK_DT,
 ): UserCommand => ({ seq: seq++, buttons, yaw, pitch, dt });
 
+/** Comando que ademas pide una ranura de arma. */
+export const slotCmd = (slot: number, buttons = 0): UserCommand => ({
+  ...cmd(buttons),
+  slot,
+});
+
 /** Ejecuta `ticks` comandos identicos y devuelve el estado final. */
 export const runTicks = <T>(
   ticks: number,

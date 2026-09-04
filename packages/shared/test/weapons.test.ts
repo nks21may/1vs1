@@ -2,16 +2,69 @@ import { describe, expect, it } from 'vitest';
 
 import { MAX_HEALTH, MAX_SPEED } from '../src/constants.js';
 import {
+  KNIFE,
   PISTOL,
   RIFLE,
   SNIPER,
+  WEAPONS,
+  WEAPON_SLOTS,
   computeDamage,
   computeShotAngles,
   computeSpread,
   getRecoil,
   shotSeed,
+  weaponForSlot,
   weaponSpeedMultiplier,
 } from '../src/weapons.js';
+
+describe('ranuras de arma', () => {
+  it('hay una ranura por arma y ninguna se repite', () => {
+    expect(new Set(WEAPON_SLOTS).size).toBe(WEAPON_SLOTS.length);
+    expect(WEAPON_SLOTS.length).toBe(Object.keys(WEAPONS).length);
+  });
+
+  it('el orden es el que se le cuenta al jugador', () => {
+    expect(weaponForSlot(1)).toBe('rifle');
+    expect(weaponForSlot(2)).toBe('pistol');
+    expect(weaponForSlot(3)).toBe('knife');
+    expect(weaponForSlot(4)).toBe('sniper');
+  });
+
+  it('fuera de rango no hay arma', () => {
+    expect(weaponForSlot(0)).toBeNull();
+    expect(weaponForSlot(5)).toBeNull();
+    expect(weaponForSlot(-1)).toBeNull();
+  });
+});
+
+describe('cuchillo', () => {
+  it('es la unica arma cuerpo a cuerpo', () => {
+    const cuerpoACuerpo = Object.values(WEAPONS).filter((w) => w.melee);
+    expect(cuerpoACuerpo).toEqual([KNIFE]);
+  });
+
+  it('sin cargador que gastar ni recarga que esperar', () => {
+    expect(KNIFE.magazine).toBe(0);
+    expect(KNIFE.reloadTime).toBe(0);
+  });
+
+  it('acierta igual quieto que corriendo: a esa distancia no hay cono', () => {
+    const parado = computeSpread(KNIFE, { speed: 0, onGround: true, ducking: false }, MAX_SPEED);
+    const corriendo = computeSpread(
+      KNIFE,
+      { speed: MAX_SPEED, onGround: true, ducking: false },
+      MAX_SPEED,
+    );
+    expect(parado).toBe(0);
+    expect(corriendo).toBe(0);
+  });
+
+  it('dos tajos al cuerpo matan, uno a la cabeza tambien', () => {
+    expect(computeDamage(KNIFE, 'chest', 40) * 2).toBeGreaterThanOrEqual(MAX_HEALTH);
+    expect(computeDamage(KNIFE, 'chest', 40)).toBeLessThan(MAX_HEALTH);
+    expect(computeDamage(KNIFE, 'head', 40)).toBeGreaterThanOrEqual(MAX_HEALTH);
+  });
+});
 
 describe('patron de retroceso', () => {
   it('es acumulativo hacia arriba', () => {

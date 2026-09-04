@@ -16,6 +16,7 @@ import {
   type GameEvent,
   type GameMap,
   type FootstepTracker,
+  HELD_BUTTONS,
   INPUT_BUFFER_SIZE,
   INTERP_DELAY_MS,
   LagCompensationBuffer,
@@ -240,9 +241,22 @@ export class MatchSession {
     const commands =
       count > 0
         ? participant.queue.splice(0, count)
-        : // Sin comandos nuevos repetimos el ultimo sin acciones: la gravedad
-          // debe seguir aplicandose aunque el cliente deje de hablar.
-          [{ ...participant.lastCommand, buttons: 0, dt: TICK_DT }];
+        : // Sin comandos nuevos repetimos el ultimo, pero solo con la postura:
+          // la gravedad debe seguir aplicandose aunque el cliente deje de
+          // hablar, y nadie quiere que el servidor dispare o avance en su
+          // nombre. La postura si se conserva porque el jugador la sigue
+          // manteniendo en su pantalla: borrarla dejaba al servidor levantando
+          // a un jugador agachado durante los huecos normales del jitter, con
+          // la velocidad maxima disparandose de 73 a 215 u/s y la correccion
+          // resultante sacudiendo la camara.
+          [
+            {
+              ...participant.lastCommand,
+              buttons: participant.lastCommand.buttons & HELD_BUTTONS,
+              slot: 0,
+              dt: TICK_DT,
+            },
+          ];
 
     for (const rawCmd of commands) {
       const cmd = applyPhaseRestrictions(rawCmd, frozen);
@@ -465,6 +479,7 @@ export class MatchSession {
       yaw: round2(player.yaw),
       pitch: round2(player.pitch),
       flags,
+      duck: round2(player.duckProgress),
       health: player.health,
       weapon: player.weapon,
       ammo: player.ammo[player.weapon],

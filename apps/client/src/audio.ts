@@ -31,6 +31,7 @@ export type SoundName =
   | 'rifle'
   | 'pistol'
   | 'sniper'
+  | 'knife'
   | 'impact'
   | 'hit'
   | 'headshot'
@@ -41,7 +42,11 @@ export type SoundName =
   | 'death'
   | 'roundStart'
   | 'win'
-  | 'lose';
+  | 'lose'
+  /** Aviso anticipado: "salta ahora" justo antes de tocar suelo. */
+  | 'bhopCue'
+  /** Confirmacion de que el salto encadeno dentro de la ventana. */
+  | 'bhop';
 
 export class AudioEngine {
   private context: AudioContext | null = null;
@@ -165,6 +170,17 @@ export class AudioEngine {
           tail: 0.9,
         });
         break;
+      case 'knife':
+        // Un tajo, no un disparo: aire cortado y nada de cuerpo grave. Son dos
+        // rafagas de ruido a frecuencias distintas porque el barrido descendente
+        // es lo que se lee como "algo ha pasado por delante".
+        this.noise(gain, now, {
+          duration: 0.07, frequency: 3400, q: 0.8, level: 0.24, highpass: true,
+        });
+        this.noise(gain, now + 0.03, {
+          duration: 0.1, frequency: 1250, q: 1.4, level: 0.18,
+        });
+        break;
       case 'impact':
         this.noise(gain, now, { duration: 0.09, frequency: 1800, q: 2, level: 0.3 });
         break;
@@ -202,6 +218,17 @@ export class AudioEngine {
         break;
       case 'lose':
         this.sweep(gain, now, 400, 120, 0.7, 0.25);
+        break;
+      case 'bhopCue':
+        // Corto, agudo y flojo: tiene que caber entre los pasos y el aterrizaje
+        // sin taparlos, porque lo que aporta es *cuando* suena, no cuanto.
+        this.blip(gain, now, 1760, 0.035, 0.16, 'square');
+        break;
+      case 'bhop':
+        // Dos notas hacia arriba: se oye como "sigue" y se distingue del aviso
+        // sin tener que mirar nada.
+        this.blip(gain, now, 990, 0.045, 0.15);
+        this.blip(gain, now + 0.045, 1480, 0.06, 0.15);
         break;
     }
   }

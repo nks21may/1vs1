@@ -13,9 +13,9 @@
 import { MAX_COMMANDS_PER_PACKET, MAX_PITCH, TICK_DT } from './constants.js';
 import type { MatchPhase, RoundEndReason } from './match.js';
 import type { UserCommand } from './movement.js';
-import type { HitGroup, WeaponId } from './weapons.js';
+import { WEAPON_SLOTS, type HitGroup, type WeaponId } from './weapons.js';
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 // --- Cliente -> Servidor ---
 
@@ -72,6 +72,16 @@ export interface PlayerSnapshot {
   pitch: number;
   /** Bit 0: agachado, bit 1: en el suelo, bit 2: vivo. */
   flags: number;
+  /**
+   * Progreso de agachado en [0, 1].
+   *
+   * Viaja aparte del bit `DUCKING` porque no es lo mismo: el bit dice si el
+   * hitbox ya es el bajo, y este numero dice por donde va la transicion, que es
+   * de donde sale la altura de la camara. Deducirlo del bit (0 o 1) hacia que
+   * cualquier correccion durante la bajada teletransportase la vista 18
+   * unidades, y eso es exactamente el temblor que se veia al moverse agachado.
+   */
+  duck: number;
   health: number;
   weapon: WeaponId;
   ammo: number;
@@ -204,7 +214,15 @@ const parseCommand = (raw: unknown): UserCommand | null => {
     yaw: normalizeYaw(cmd.yaw),
     pitch: Math.max(-MAX_PITCH, Math.min(MAX_PITCH, cmd.pitch)),
     dt: cmd.dt,
+    slot: parseSlot(cmd.slot),
   };
+};
+
+/** Ranura de arma pedida. Cualquier valor que no sea una ranura real es un 0. */
+const parseSlot = (raw: unknown): number => {
+  if (!isFiniteNumber(raw)) return 0;
+  const slot = Math.floor(raw);
+  return slot >= 1 && slot <= WEAPON_SLOTS.length ? slot : 0;
 };
 
 const normalizeYaw = (yaw: number): number => {

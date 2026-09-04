@@ -273,7 +273,7 @@ así se pudra.
     precisión dependeria de una animación.
   - El cambio de arma pasa a ser un ciclo de tres. Silueta y sonido propios: la
     del visor y el cañón largo, y un disparo más grave y con el doble de cola que
-    el del rifle.
+    el del rifle. **El ciclo ya no existe** (ver B01): hay una tecla por arma.
   - Verificado en partida real: el servidor confirma `weapon: sniper`, apuntar
     lleva el FOV de 74° a 28° y cierra la mira, y no hay errores de consola.
 
@@ -388,6 +388,63 @@ así se pudra.
 
 ---
 
+## Arreglos de bugs reportados en partida
+
+Los pidió Nicolás el 2026-09-04 jugando, no salieron de este backlog. Se anotan
+aquí porque dos de ellos cambiaron reglas del juego, no solo código.
+
+- [x] **B01. Una tecla por arma, sin ciclo**
+  `Digit2` estaba enlazada al mismo botón que `Q` y ese botón *rotaba* de arma,
+  así que una pulsación larga o la repetición del teclado encadenaba cambios y se
+  acababa con un arma que nadie había pedido.
+  - El botón `SWITCH` desaparece del comando. En su lugar viaja un campo `slot`
+    (1-4) que dice *qué* arma se quiere, no "cambia": pedir la que ya se lleva no
+    hace nada, así que mantener la tecla es inofensivo por construcción y no hay
+    que detectar el flanco de la pulsación.
+  - `1` rifle, `2` pistola, `3` cuchillo, `4` sniper. `PROTOCOL_VERSION` sube a 2:
+    un cliente viejo en caché no podría cambiar de arma, y es mejor que lo rechace.
+
+- [x] **B02. La cámara temblaba al moverse agachado**
+  Dos causas encadenadas, las dos arregladas:
+  - Al quedarse sin comandos (los huecos son constantes con el jitter normal), el
+    servidor repetía el último con `buttons: 0`, o sea **levantaba** a un jugador
+    que seguía agachado en su pantalla. La velocidad máxima simulada saltaba de 73
+    a 215 u/s varias veces por segundo y la corrección resultante sacudía la vista.
+    Ahora el comando repetido conserva los botones de postura (`HELD_BUTTONS`).
+  - El `duckProgress` no viajaba en la instantánea, así que el cliente lo deducía
+    del bit `DUCKING`: 0 o 1, nunca la transición. Cualquier corrección a media
+    bajada movía la cámara 18 unidades de golpe. Ahora se envía el progreso.
+
+- [x] **B03. Cuchillo en la tecla 3**
+  SPLICE: cuerpo a cuerpo, ×1,16 de velocidad (lo más rápido del juego), 76
+  unidades de alcance, dos tajos al cuerpo o uno a la cabeza. La sniper pasa al
+  `4`. No gasta munición ni se recarga: `WeaponDef.melee` decide eso, el clic en
+  vacío y el `∞` del HUD.
+
+- [x] **B04. Bunnyhop con aviso sonoro**
+  - **Bug latente que salió por el camino:** el evento `landed` no se emitía
+    *nunca*. Se decidía antes de mover al jugador en ese tick, así que cayendo
+    siempre lo veía todavía en el aire. Por eso no sonaba el golpe al aterrizar ni
+    se aplicaba la penalización por caída fuerte. Ahora se decide después del
+    último `categorizePosition`, que es el que ve el contacto de verdad.
+  - Regla: saltar dentro de los 150 ms siguientes al contacto conserva la
+    velocidad; fuera de ella se recorta a ×1,1 de la carrera. Dentro de la ventana
+    el suelo no aplica fricción, y **eso es lo que hace jugable la mecánica**: con
+    fricción, dos ticks se comen lo ganado en el aire y solo valdría el salto en
+    el tick exacto del contacto (15 ms), imposible de acertar de oído.
+  - Techo relativo al arma (×1,7 de *su* carrera): 306 con la sniper, 365 con el
+    rifle, 441 con el cuchillo. Con un techo absoluto, el bhop borraría los
+    multiplicadores de velocidad de las armas.
+  - Aviso: un clic agudo 130 ms antes del aterrizaje previsto (`timeToLanding`,
+    balística pura contra el suelo de debajo). Con una ventana de 150 ms valen las
+    reacciones de 130 a 280 ms. Un tono ascendente confirma el salto que entró.
+    Se puede apagar en los ajustes.
+  - Medido encadenando saltos con air-strafe desde 250 u/s: 250 → 270 → 289 → 307
+    → ... hasta el techo. Con 12 ticks de retraso (187 ms) la cadena se rompe y la
+    velocidad cae por debajo de 150.
+
+---
+
 ## Decisiones ya tomadas (no revertir sin motivo)
 
 Cosas que parecen mejorables pero son deliberadas. Si una iteración futura quiere
@@ -405,6 +462,17 @@ cambiarlas, que sea a propósito y no por descuido:
 - **La primera bala es exacta.** El patrón de retroceso empieza en cero a
   propósito: es lo que hace que el primer disparo sea una decisión y no una
   lotería.
+- **Una tecla por arma, no un ciclo.** Y la petición viaja como "quiero esta
+  arma", no como "cambia": es lo que hace que mantener la tecla sea inofensivo sin
+  necesidad de detectar flancos. Ver B01.
+- **Dentro de la ventana de bhop el suelo no da fricción.** Parece una excepción
+  gratuita en la física y es justo lo contrario: sin ella la ventana de 150 ms es
+  decorativa y la única forma de encadenar sería acertar el tick exacto del
+  contacto. Ver B04.
+- **El comando que el servidor se inventa conserva la postura.** Cuando el buffer
+  de entrada se queda vacío se repite el último comando sin *acciones* (disparar,
+  moverse, saltar) pero con la *postura* (agachado, andando, apuntando). Borrarla
+  entera separaba las dos simulaciones varias veces por segundo. Ver B02.
 - **La simulación no consulta el reloj.** Todo avanza por pasos explícitos. Es lo
   que permite simular una partida entera en milisegundos en los tests; cualquier
   `Date.now()` dentro de la simulación rompe esa propiedad.

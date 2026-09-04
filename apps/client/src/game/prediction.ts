@@ -133,7 +133,10 @@ export class PredictionSystem {
     this.player.vel = vec3(snapshot.vx, snapshot.vy, snapshot.vz);
     this.player.onGround = (snapshot.flags & SNAPSHOT_FLAG.ON_GROUND) !== 0;
     this.player.ducking = (snapshot.flags & SNAPSHOT_FLAG.DUCKING) !== 0;
-    this.player.duckProgress = this.player.ducking ? 1 : 0;
+    // El progreso viene del servidor tal cual: deducirlo del bit `DUCKING`
+    // saltaba a 0 o a 1 y movia la camara 18 unidades de golpe en mitad de
+    // cualquier correccion, que es de donde salia el temblor al agacharse.
+    this.player.duckProgress = snapshot.duck;
     this.player.health = snapshot.health;
     this.player.alive = (snapshot.flags & SNAPSHOT_FLAG.ALIVE) !== 0;
     this.player.weapon = snapshot.weapon;

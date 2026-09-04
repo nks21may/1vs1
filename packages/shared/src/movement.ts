@@ -3,7 +3,7 @@
  *
  * Reimplementa la cadena `PM_PlayerMove` de Valve: friccion, aceleracion
  * limitada por proyeccion, tope de `wishspeed` en el aire (de ahi salen el
- * air-strafing y el bhop), salto con recorte anti-bunnyhop y subida de
+ * air-strafing y el bhop), salto con ventana de encadenado y subida de
  * escalones. La funcion es pura respecto al mundo y avanza con un paso fijo,
  * de modo que el mismo comando produce el mismo resultado en cliente y
  * servidor: es el requisito para la prediccion con reconciliacion.
@@ -13,6 +13,9 @@ import {
   ACCELERATE,
   AIR_ACCELERATE,
   AIR_MAX_WISH_SPEED,
+  BHOP_CUE_MAX_DROP,
+  BHOP_SPEED_RATIO,
+  BHOP_WINDOW,
   BUTTON,
   DUCK_SPEED_MULTIPLIER,
   DUCK_TRANSITION_TIME,
@@ -23,6 +26,7 @@ import {
   FRICTION,
   GRAVITY,
   JUMP_IMPULSE,
+  JUMP_SPEED_CAP,
   LAND_PENALTY_MIN_FALL_SPEED,
   LAND_SPEED_PENALTY,
   MAX_GROUND_NORMAL_Z,
@@ -67,6 +71,11 @@ export interface MoveState {
   duckProgress: number;
   /** Impide el auto-bhop: hay que soltar salto entre brincos. */
   jumpHeld: boolean;
+  /**
+   * Segundos apoyado en el suelo desde el ultimo aterrizaje. Es lo que mide si
+   * un salto entra en la ventana de bhop.
+   */
+  timeSinceLanding: number;
 }
 
 /** Comando de entrada de un tick. */
@@ -78,6 +87,13 @@ export interface UserCommand {
   pitch: number;
   /** Paso de tiempo del comando en segundos (fijo, validado por el servidor). */
   dt: number;
+  /**
+   * Ranura de arma que se pide en este tick (1-based), o 0/ausente si no se pide
+   * ninguna. Va como numero y no como bits de `buttons` porque lo que el jugador
+   * expresa es "quiero *esta* arma", no "pulso una tecla": asi la peticion es
+   * idempotente y mantener la tecla no encadena cambios.
+   */
+  slot?: number;
 }
 
 /** Eventos observables del movimiento, utiles para sonido y animacion. */
@@ -85,6 +101,11 @@ export interface MoveEvents {
   jumped: boolean;
   landed: boolean;
   landingSpeed: number;
+  /**
+   * El salto salio dentro de la ventana de bhop y a velocidad de carrera: es la
+   * senal que el cliente convierte en confirmacion sonora.
+   */
+  bhop: boolean;
 }
 
 export const playerMins = (): Vec3 => vec3(-PLAYER_HALF_WIDTH, -PLAYER_HALF_WIDTH, 0);
@@ -386,7 +407,12 @@ export const moveStep = (
   world: CollisionWorld,
   weaponSpeedMultiplier = 1,
 ): MoveEvents => {
-  const events: MoveEvents = { jumped: false, landed: false, landingSpeed: 0 };
+  const events: MoveEvents = {
+    jumped: false,
+    landed: false,
+    landingSpeed: 0,
+    bhop: false,
+  };
   const dt = cmd.dt;
 
   state.yaw = cmd.yaw;
@@ -398,19 +424,17 @@ export const moveStep = (
   updateDuck(state, world, hasButton(cmd.buttons, BUTTON.DUCK), dt);
   categorizePosition(state, world);
 
-  if (state.onGround && !wasOnGround) {
-    events.landed = true;
-    events.landingSpeed = fallSpeed;
-    if (fallSpeed > LAND_PENALTY_MIN_FALL_SPEED) {
-      state.vel.x *= LAND_SPEED_PENALTY;
-      state.vel.y *= LAND_SPEED_PENALTY;
-    }
-  }
+  // El reloj de la ventana de bhop solo corre con los pies en el suelo: en el
+  // aire no hay nada que cronometrar. Se pone a cero abajo, al detectar el
+  // contacto de verdad.
+  if (state.onGround && wasOnGround) state.timeSinceLanding += dt;
 
   const jumpPressed = hasButton(cmd.buttons, BUTTON.JUMP);
   const { dir: wishDir, magnitude } = wishDirection(cmd.buttons, state.yaw);
   const maxSpeed = maxSpeedFor(cmd.buttons, state.ducking, weaponSpeedMultiplier);
   const wishSpeed = magnitude * maxSpeed;
+  /** Carrera del arma equipada, sin contar postura: la base del techo de bhop. */
+  const runSpeed = MAX_SPEED * weaponSpeedMultiplier;
 
   // Media gravedad antes del desplazamiento y media despues: integracion
   // simetrica, para que la altura del salto no dependa del tickrate.
@@ -418,9 +442,16 @@ export const moveStep = (
 
   if (state.onGround) {
     if (jumpPressed && !state.jumpHeld) {
-      // Recorte anti-bunnyhop: encadenar saltos no acelera indefinidamente.
       const speed = length2D(state.vel);
-      const cap = MAX_SPEED * 1.1;
+      // Bhop: saltar nada mas tocar suelo conserva lo ganado en el aire; llegar
+      // tarde recorta al tope de siempre y la cadena se rompe. El techo alto
+      // sigue existiendo para que la habilidad tenga premio, pero acotado.
+      const chained = state.timeSinceLanding <= BHOP_WINDOW;
+      // El `max` no es defensivo por gusto: apuntando con la mira la carrera se
+      // desploma, y sin el, encadenar recortaria mas que no encadenar.
+      const cap = chained
+        ? Math.max(JUMP_SPEED_CAP, runSpeed * BHOP_SPEED_RATIO)
+        : JUMP_SPEED_CAP;
       if (speed > cap) {
         const f = cap / speed;
         state.vel.x *= f;
@@ -429,10 +460,19 @@ export const moveStep = (
       state.vel.z = JUMP_IMPULSE;
       state.onGround = false;
       events.jumped = true;
+      // Solo se anuncia como bhop si ademas se venia corriendo: dar saltitos a
+      // tiempo en el sitio acierta la ventana pero no encadena nada, y premiarlo
+      // con el mismo sonido ensenaria el ritmo equivocado.
+      events.bhop = chained && speed > runSpeed * 0.8;
       accelerate(state.vel, wishDir, wishSpeed, ACCELERATE, dt);
       tryPlayerMove(state, world, dt);
     } else {
-      applyFriction(state.vel, dt);
+      // Dentro de la ventana el jugador todavia viene deslizando. Sin esta
+      // excepcion la ventana seria decorativa: la friccion muerde un 8% por
+      // tick, asi que a los dos ticks ya se ha comido lo ganado en el aire y
+      // solo valdria saltar en el tick exacto del contacto -- 15 ms, imposible
+      // de acertar por oido y justo lo que el aviso sonoro pretende ensenar.
+      if (state.timeSinceLanding > BHOP_WINDOW) applyFriction(state.vel, dt);
       state.vel.z = 0;
       accelerate(state.vel, wishDir, wishSpeed, ACCELERATE, dt);
       stepMove(state, world, dt);
@@ -449,6 +489,21 @@ export const moveStep = (
   categorizePosition(state, world);
   if (state.onGround && state.vel.z < 0) state.vel.z = 0;
 
+  // El aterrizaje se decide aqui y no antes de mover, que es donde estaba: la
+  // primera comprobacion mira el suelo *antes* del desplazamiento del tick, asi
+  // que cuando el jugador venia cayendo siempre lo veia en el aire y el evento
+  // no llegaba a emitirse nunca. Con el ya se oye el golpe, la caida larga
+  // cobra su penalizacion y la ventana de bhop tiene desde cuando contar.
+  if (state.onGround && !wasOnGround) {
+    events.landed = true;
+    events.landingSpeed = fallSpeed;
+    if (fallSpeed > LAND_PENALTY_MIN_FALL_SPEED) {
+      state.vel.x *= LAND_SPEED_PENALTY;
+      state.vel.y *= LAND_SPEED_PENALTY;
+    }
+    state.timeSinceLanding = 0;
+  }
+
   return events;
 };
 
@@ -462,7 +517,34 @@ export const createMoveState = (pos: Vec3, yaw = 0): MoveState => ({
   ducking: false,
   duckProgress: 0,
   jumpHeld: false,
+  timeSinceLanding: 0,
 });
+
+/**
+ * Segundos que faltan para tocar suelo, o `null` si el jugador no esta cayendo
+ * o no hay suelo a la vista.
+ *
+ * Es una prediccion balistica pura: mira recto hacia abajo e ignora que el
+ * jugador se desplaza en horizontal mientras cae. Basta porque su unico uso es
+ * avisar al jugador con antelacion de cuando pulsar salto -- no entra en la
+ * simulacion, asi que equivocarse aqui no descuadra nada.
+ */
+export const timeToLanding = (
+  state: MoveState,
+  world: CollisionWorld,
+  maxDrop = BHOP_CUE_MAX_DROP,
+): number | null => {
+  if (state.onGround || state.vel.z > 0) return null;
+
+  const end = vec3(state.pos.x, state.pos.y, state.pos.z - maxDrop);
+  const trace = traceBox(world, state.pos, end, playerMins(), playerMaxs(state.ducking));
+  if (!trace.hit || trace.startSolid) return null;
+
+  const drop = state.pos.z - trace.endPos.z;
+  const fall = -state.vel.z;
+  // d = v t + g t^2 / 2  =>  t = (sqrt(v^2 + 2 g d) - v) / g
+  return (Math.sqrt(fall * fall + 2 * GRAVITY * drop) - fall) / GRAVITY;
+};
 
 /**
  * Contador de zancada. Vive fuera del `PlayerState` a proposito: no forma parte

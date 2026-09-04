@@ -49,6 +49,38 @@ const lock = (): void => {
   document.dispatchEvent(new Event('pointerlockchange'));
 };
 
+describe('ranuras de arma', () => {
+  it('cada numero pide siempre la misma arma', () => {
+    key('keydown', 'Digit3');
+    expect(input.consume().slot).toBe(3);
+  });
+
+  it('sin teclas de arma no se pide ninguna ranura', () => {
+    expect(input.consume().slot).toBe(0);
+  });
+
+  it('con varias pulsadas gana la de menor numero', () => {
+    key('keydown', 'Digit4');
+    key('keydown', 'Digit2');
+    expect(input.consume().slot).toBe(2);
+  });
+
+  /**
+   * El bug que fija este test: antes el cambio de arma era un ciclo, asi que
+   * mantener la tecla (o la repeticion automatica del teclado) encadenaba
+   * cambios y se acababa con un arma que nadie habia pedido. Pedir una ranura
+   * es idempotente: repetirla no puede llevar a otra arma.
+   */
+  it('mantener la tecla repite la misma peticion, no la siguiente', () => {
+    key('keydown', 'Digit2');
+    expect(input.consume().slot).toBe(2);
+    expect(input.consume().slot).toBe(2);
+
+    key('keyup', 'Digit2');
+    expect(input.consume().slot).toBe(0);
+  });
+});
+
 describe('teclado', () => {
   it('traduce las teclas a botones del comando', () => {
     key('keydown', 'KeyW');

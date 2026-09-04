@@ -129,15 +129,20 @@ export class Hud {
     this.healthFill.classList.toggle('is-critical', critical);
   }
 
+  /**
+   * Arma y municion. Un cargador de cero balas es un arma cuerpo a cuerpo: no
+   * gasta nada, asi que mostrar un "0" en rojo mentiria diciendo que esta
+   * vacia y que hay que recargarla.
+   */
   setWeapon(name: string, ammo: number, magazine: number, reload: number): void {
+    const melee = magazine === 0;
     this.weaponName.textContent = name;
-    this.ammoValue.textContent = String(ammo);
-    this.ammoValue.classList.toggle('is-empty', ammo === 0);
+    this.ammoValue.textContent = melee ? '∞' : String(ammo);
+    this.ammoValue.classList.toggle('is-empty', !melee && ammo === 0);
 
     const reloading = reload > 0;
     this.reloadBar.hidden = !reloading;
     if (reloading) this.reloadFill.style.transform = `scaleX(${clamp(reload, 0, 1)})`;
-    void magazine;
   }
 
   setSpeed(speed: number, maxSpeed: number): void {

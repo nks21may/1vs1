@@ -38,15 +38,26 @@ un duelo real, **Buscar rival** en dos pestañas o dos equipos.
 | `Espacio` | Saltar |
 | `Ctrl` / `C` | Agacharse |
 | `Shift` | Andar en silencio (más lento, más preciso) |
-| `Q` | Cambiar entre rifle y pistola |
+| `1` `2` `3` `4` | Rifle, pistola, cuchillo, rifle de precisión |
 | `R` | Recargar |
 | Clic izquierdo | Disparar |
+| Clic derecho | Apuntar (solo el arma con mira) |
 | `Esc` | Liberar el ratón |
+
+Cada arma tiene su propia tecla y siempre la misma: pulsar un número lleva a *esa*
+arma, no a la siguiente de una lista.
+
+| Ranura | Arma | Qué aporta | Qué cuesta |
+|---|---|---|---|
+| `1` | VEKTOR-9 (rifle) | Automática, patrón memorizable | ×0,86 de velocidad |
+| `2` | AXIOM (pistola) | Velocidad de carrera intacta | 26 de daño por bala |
+| `3` | SPLICE (cuchillo) | ×1,16 de velocidad: el arma de moverse | Alcance de 76 unidades |
+| `4` | LONGWAVE (sniper) | Mata de un tiro al cuerpo, con mira | ×0,72 y un segundo entre tiros |
 
 Reglas: partidas al mejor de 15 (primero a 8 rondas), sin reaparición dentro de la
 ronda, 90 segundos por ronda y cambio de lado en cada una.
 
-Tres cosas que conviene saber antes del primer duelo:
+Cuatro cosas que conviene saber antes del primer duelo:
 
 1. **Moverse arruina la puntería.** La dispersión crece con el cuadrado de la
    velocidad. Hay que frenar antes de disparar, y la forma rápida de frenar es
@@ -58,6 +69,10 @@ Tres cosas que conviene saber antes del primer duelo:
    compensar con el ratón es cosa tuya.
 3. **En el aire no se acierta**, pero sí se gana velocidad: girando la vista hacia
    el lado que estás pulsando se supera el límite de carrera (*air-strafing*).
+4. **El bunnyhop se encadena de oído.** Un clic agudo suena 130 ms antes de tocar
+   suelo: saltar al oírlo conserva la velocidad ganada en el aire y la cadena
+   sigue. Llegar tarde deja que la fricción se la coma. Un tono ascendente
+   confirma cada salto que ha entrado a tiempo. Se puede apagar en los ajustes.
 
 ---
 
@@ -149,14 +164,24 @@ Constantes copiadas de Source, porque son las que producen esa sensación:
 | Fricción / velocidad de parada | 5,2 / 80 u/s |
 | Impulso de salto | 301,993 u/s (57 unidades de altura) |
 | Escalón máximo | 18 unidades |
+| Ventana de bunnyhop | 150 ms desde el aterrizaje |
+| Techo encadenando | ×1,7 de la carrera del arma equipada |
 
 La clave del "feel" está en dos detalles. La aceleración limita la *proyección* de
 la velocidad sobre la dirección deseada, no su módulo: por eso girar mientras se
 strafea en el aire añade velocidad indefinidamente. Y la fricción pasa a ser
 constante por debajo de 80 u/s, que es lo que permite pararse en seco.
 
-Hay recorte anti-bunnyhop al saltar y penalización al aterrizar fuerte, así que el
-bhop encadenado da control pero no velocidad infinita.
+El bunnyhop se apoya en las dos: se gana velocidad en el aire con el strafe y se
+conserva si el siguiente salto sale dentro de los 150 ms posteriores al contacto,
+porque dentro de esa ventana el suelo todavía no aplica fricción. Fuera de ella la
+velocidad se recorta a ×1,1 de la carrera y la cadena se rompe. El techo es
+relativo al arma equipada (×1,7 de *su* carrera), de modo que encadenar saltos no
+borra el peso de llevar la sniper encima. Sigue haciendo falta soltar el espacio
+entre salto y salto: no hay auto-bhop.
+
+Aterrizar tras una caída larga (más de 580 u/s) sigue costando un 15 % de la
+velocidad horizontal.
 
 ---
 

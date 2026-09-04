@@ -12,7 +12,7 @@
 
 import { createRandom, degToRad, hashSeed } from './math.js';
 
-export type WeaponId = 'rifle' | 'pistol' | 'sniper';
+export type WeaponId = 'rifle' | 'pistol' | 'knife' | 'sniper';
 export type FireMode = 'auto' | 'semi';
 
 export interface SpreadProfile {
@@ -51,6 +51,13 @@ export interface WeaponDef {
   readonly legMultiplier: number;
   readonly magazine: number;
   readonly reloadTime: number;
+  /**
+   * Cuerpo a cuerpo: no gasta municion ni se recarga. Es una bandera explicita y
+   * no `magazine === 0` porque de ella dependen tres decisiones distintas (poder
+   * disparar, el clic en vacio y lo que pinta el HUD), y encadenarlas a un cero
+   * las volveria fragiles ante cualquier arma futura con cargador raro.
+   */
+  readonly melee: boolean;
   /** Multiplicador de velocidad de movimiento al llevarla equipada. */
   readonly speedMultiplier: number;
   readonly spread: SpreadProfile;
@@ -135,6 +142,7 @@ export const RIFLE: WeaponDef = {
   legMultiplier: 0.75,
   magazine: 30,
   reloadTime: 2.4,
+  melee: false,
   speedMultiplier: 0.86,
   spread: { base: 0.12, moving: 3.6, air: 9, duckingMultiplier: 0.65 },
   range: 8192,
@@ -158,6 +166,7 @@ export const PISTOL: WeaponDef = {
   legMultiplier: 0.75,
   magazine: 20,
   reloadTime: 1.8,
+  melee: false,
   speedMultiplier: 1,
   spread: { base: 0.2, moving: 2.4, air: 6, duckingMultiplier: 0.7 },
   range: 4096,
@@ -199,6 +208,7 @@ export const SNIPER: WeaponDef = {
   legMultiplier: 0.6,
   magazine: 5,
   reloadTime: 3.2,
+  melee: false,
   // Pesa: con ella encima se corre bastante menos que con el rifle.
   speedMultiplier: 0.72,
   // Sin apuntar es un arma inservible a media distancia, a proposito.
@@ -221,13 +231,60 @@ export const SNIPER: WeaponDef = {
   },
 };
 
+/**
+ * Cuchillo. No es un arma de matar a distancia, es una decision de movilidad:
+ * guardarlo todo y correr es lo que permite cruzar un angulo abierto o encadenar
+ * saltos, a cambio de quedarse sin respuesta si aparece alguien.
+ *
+ * Se resuelve con el mismo hitscan que el resto, solo que con un alcance de
+ * cuatro palmos: no hace falta un sistema aparte para el cuerpo a cuerpo.
+ */
+export const KNIFE: WeaponDef = {
+  id: 'knife',
+  name: 'SPLICE',
+  mode: 'semi',
+  cycleTime: 0.42,
+  // Dos tajos al cuerpo matan; a la cabeza, uno. Llegar hasta ahi ya es el precio.
+  damage: 65,
+  headshotMultiplier: 1.6,
+  legMultiplier: 0.8,
+  magazine: 0,
+  reloadTime: 0,
+  melee: true,
+  // La razon de existir del arma: con ella se corre mas que con nada.
+  speedMultiplier: 1.16,
+  // Sin dispersion: a este alcance el cono no aportaria mas que ruido.
+  spread: { base: 0, moving: 0, air: 0, duckingMultiplier: 1 },
+  range: 76,
+  falloffStart: 76,
+  falloffPer1000: 0,
+  recoilPattern: [[0, 0]],
+  recoilResetTime: 0.5,
+  viewPunchRatio: 0,
+  viewPunchRecovery: 12,
+  tracerColor: 0xa6ff6f,
+  aim: null,
+};
+
 export const WEAPONS: Readonly<Record<WeaponId, WeaponDef>> = {
   rifle: RIFLE,
   pistol: PISTOL,
+  knife: KNIFE,
   sniper: SNIPER,
 };
 
 export const getWeapon = (id: WeaponId): WeaponDef => WEAPONS[id];
+
+/**
+ * Que arma hay en cada ranura del teclado. El orden *es* la interfaz: una tecla
+ * por arma, siempre la misma, en vez de un ciclo que obliga a mirar el HUD para
+ * saber que se lleva encima.
+ */
+export const WEAPON_SLOTS: readonly WeaponId[] = ['rifle', 'pistol', 'knife', 'sniper'];
+
+/** Arma de la ranura `slot` (1-based), o `null` si la ranura no existe. */
+export const weaponForSlot = (slot: number): WeaponId | null =>
+  WEAPON_SLOTS[slot - 1] ?? null;
 
 /**
  * Multiplicador de velocidad del arma, contando el apuntado. Apuntar solo

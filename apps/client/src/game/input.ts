@@ -16,7 +16,12 @@ export interface InputBindings {
   duck: string[];
   walk: string[];
   reload: string[];
-  switchWeapon: string[];
+  /**
+   * Una tecla por arma, en el orden de `WEAPON_SLOTS`. Es una lista de listas y
+   * no un ciclo a proposito: con un ciclo, pulsar dos veces seguido (o que se
+   * repita la pulsacion) cambiaba a un arma que nadie habia pedido.
+   */
+  slots: string[][];
   /** Abrir el marcador. Es solo del cliente: no viaja al servidor. */
   stats: string[];
 }
@@ -30,7 +35,12 @@ export const DEFAULT_BINDINGS: InputBindings = {
   duck: ['ControlLeft', 'KeyC'],
   walk: ['ShiftLeft'],
   reload: ['KeyR'],
-  switchWeapon: ['KeyQ', 'Digit2'],
+  slots: [
+    ['Digit1', 'Numpad1'],
+    ['Digit2', 'Numpad2'],
+    ['Digit3', 'Numpad3'],
+    ['Digit4', 'Numpad4'],
+  ],
   stats: ['Tab'],
 };
 
@@ -41,6 +51,8 @@ export interface InputState {
   buttons: number;
   yaw: number;
   pitch: number;
+  /** Ranura de arma pedida (1-based), o 0 si no se pide ninguna. */
+  slot: number;
 }
 
 export class InputManager {
@@ -124,7 +136,22 @@ export class InputManager {
     this.pendingYaw = 0;
     this.pendingPitch = 0;
 
-    return { buttons: this.buttons(), yaw: this.yaw, pitch: this.pitch };
+    return {
+      buttons: this.buttons(),
+      yaw: this.yaw,
+      pitch: this.pitch,
+      slot: this.slot(),
+    };
+  }
+
+  /**
+   * Ranura pedida este tick. Con varias teclas a la vez gana la de menor numero:
+   * hace falta *alguna* regla y esta es la unica que no depende del orden en que
+   * el navegador haya entregado los eventos.
+   */
+  private slot(): number {
+    const index = this.bindings.slots.findIndex((codes) => this.isDown(codes));
+    return index + 1;
   }
 
   private buttons(): number {
@@ -137,7 +164,6 @@ export class InputManager {
     if (this.isDown(this.bindings.duck)) buttons |= BUTTON.DUCK;
     if (this.isDown(this.bindings.walk)) buttons |= BUTTON.WALK;
     if (this.isDown(this.bindings.reload)) buttons |= BUTTON.RELOAD;
-    if (this.isDown(this.bindings.switchWeapon)) buttons |= BUTTON.SWITCH;
     // Boton izquierdo del raton: disparar. Derecho: apuntar.
     if (this.mouseButtons & 1) buttons |= BUTTON.ATTACK;
     if (this.mouseButtons & (1 << 2)) buttons |= BUTTON.AIM;

@@ -9,8 +9,8 @@ import {
   respawnPlayer,
   simulatePlayerTick,
 } from '../src/player.js';
-import { PISTOL, RIFLE } from '../src/weapons.js';
-import { cmd, flatWorld } from './helpers.js';
+import { KNIFE, PISTOL, RIFLE, SNIPER } from '../src/weapons.js';
+import { cmd, flatWorld, slotCmd } from './helpers.js';
 
 const world = flatWorld();
 
@@ -43,7 +43,7 @@ describe('disparo', () => {
 
   it('la pistola exige soltar el gatillo entre disparos', () => {
     const player = newPlayer();
-    simulatePlayerTick(player, cmd(BUTTON.SWITCH), world);
+    simulatePlayerTick(player, slotCmd(2), world);
     expect(player.weapon).toBe('pistol');
     // El cambio de arma impone una espera antes del primer disparo.
     run(player, 32, 0);
@@ -54,7 +54,7 @@ describe('disparo', () => {
 
   it('mantener el gatillo durante el cambio de arma no dispara al terminar', () => {
     const player = newPlayer();
-    simulatePlayerTick(player, cmd(BUTTON.SWITCH), world);
+    simulatePlayerTick(player, slotCmd(2), world);
     const events = run(player, 64, BUTTON.ATTACK);
     expect(events.filter((e) => e.shot).length).toBe(0);
   });
@@ -117,29 +117,103 @@ describe('disparo', () => {
 });
 
 describe('cambio de arma', () => {
-  it('recorre las tres armas en ciclo y exige soltar la tecla', () => {
+  it('cada ranura lleva siempre a la misma arma', () => {
     const player = newPlayer();
-    // Mantener pulsado no encadena cambios: cada arma exige una pulsacion.
-    run(player, 32, BUTTON.SWITCH);
-    expect(player.weapon).toBe('pistol');
+    const esperado = [
+      [2, 'pistol'],
+      [3, 'knife'],
+      [4, 'sniper'],
+      [1, 'rifle'],
+    ] as const;
 
-    run(player, 32, 0);
-    run(player, 32, BUTTON.SWITCH);
-    expect(player.weapon).toBe('sniper');
+    for (const [slot, arma] of esperado) {
+      simulatePlayerTick(player, slotCmd(slot), world);
+      expect(player.weapon).toBe(arma);
+    }
+  });
 
-    run(player, 32, 0);
-    run(player, 32, BUTTON.SWITCH);
+  it('mantener la tecla pulsada no encadena cambios', () => {
+    const player = newPlayer();
+    const events = [];
+    for (let i = 0; i < 32; i++) {
+      events.push(simulatePlayerTick(player, slotCmd(3), world));
+    }
+    expect(player.weapon).toBe('knife');
+    expect(events.filter((e) => e.switchedWeapon)).toHaveLength(1);
+  });
+
+  it('pedir el arma que ya se lleva no cuesta nada', () => {
+    const player = newPlayer();
+    const events = simulatePlayerTick(player, slotCmd(1), world);
+    expect(events.switchedWeapon).toBe(false);
+    expect(canFire(player)).toBe(true);
+  });
+
+  it('una ranura que no existe se ignora', () => {
+    const player = newPlayer();
+    simulatePlayerTick(player, slotCmd(9), world);
     expect(player.weapon).toBe('rifle');
   });
 
   it('cambiar de arma impone un tiempo antes de poder disparar', () => {
     const player = newPlayer();
-    simulatePlayerTick(player, cmd(BUTTON.SWITCH), world);
+    simulatePlayerTick(player, slotCmd(2), world);
     expect(canFire(player)).toBe(false);
   });
 
   it('la pistola permite moverse mas rapido que el rifle', () => {
     expect(PISTOL.speedMultiplier).toBeGreaterThan(RIFLE.speedMultiplier);
+  });
+});
+
+describe('cuchillo', () => {
+  /** Deja al jugador con el cuchillo y pasado el tiempo de sacarlo. */
+  const conCuchillo = () => {
+    const player = newPlayer();
+    simulatePlayerTick(player, slotCmd(3), world);
+    run(player, 32, 0);
+    return player;
+  };
+
+  it('es el arma con la que mas se corre', () => {
+    for (const arma of [RIFLE, PISTOL, SNIPER]) {
+      expect(KNIFE.speedMultiplier).toBeGreaterThan(arma.speedMultiplier);
+    }
+  });
+
+  it('sacarlo se nota en la velocidad, no solo en la ficha del arma', () => {
+    const correr = (slot: number) => {
+      const player = newPlayer();
+      simulatePlayerTick(player, slotCmd(slot), world);
+      run(player, 96, BUTTON.FORWARD);
+      return length2D(player.vel);
+    };
+    expect(correr(3)).toBeGreaterThan(correr(2) * 1.1);
+  });
+
+  it('no gasta municion ni se queda nunca sin balas', () => {
+    const player = conCuchillo();
+    const events = [];
+    for (let i = 0; i < 256; i++) {
+      // Semiautomatico: hay que soltar el boton entre tajos.
+      events.push(simulatePlayerTick(player, cmd(i % 2 === 0 ? BUTTON.ATTACK : 0), world));
+    }
+
+    expect(events.filter((e) => e.shot).length).toBeGreaterThan(5);
+    expect(events.some((e) => e.emptyClick)).toBe(false);
+    expect(events.some((e) => e.startedReload)).toBe(false);
+    expect(player.ammo.knife).toBe(0);
+  });
+
+  it('la tecla de recarga no hace nada con el cuchillo', () => {
+    const player = conCuchillo();
+    const events = simulatePlayerTick(player, cmd(BUTTON.RELOAD), world);
+    expect(events.startedReload).toBe(false);
+    expect(player.reloadRemaining).toBe(0);
+  });
+
+  it('solo alcanza a quemarropa', () => {
+    expect(KNIFE.range).toBeLessThan(PISTOL.range / 10);
   });
 });
 
@@ -243,7 +317,7 @@ describe('apuntado con mira', () => {
     expect(player.aiming).toBe(true);
 
     // Sigue pulsando apuntar mientras cambia de arma.
-    simulatePlayerTick(player, cmd(BUTTON.AIM | BUTTON.SWITCH), world);
+    simulatePlayerTick(player, slotCmd(1, BUTTON.AIM), world);
     expect(player.weapon).toBe('rifle');
     expect(player.aiming).toBe(false);
   });

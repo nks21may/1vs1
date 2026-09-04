@@ -9,6 +9,8 @@
 import { Group, Vector3 } from 'three';
 
 import {
+  BHOP_CUE_LEAD,
+  BHOP_CUE_MIN_SPEED,
   type CollisionWorld,
   DEFAULT_MAP,
   type GameMap,
@@ -35,6 +37,7 @@ import {
   maxSpeedFor,
   weaponSpeedMultiplier,
   shotDirection,
+  timeToLanding,
   traceHitscan,
   vec3,
 } from '@neonduel/shared';
@@ -104,6 +107,11 @@ export class Game {
   private lastYaw = 0;
   private lastPitch = 0;
   private readonly footsteps = createFootstepTracker();
+  /**
+   * Si queda aviso de bhop pendiente en este salto. Se rearma al pisar suelo,
+   * de modo que suena una vez por caida y no en cada tick del descenso.
+   */
+  private bhopCueArmed = false;
   /** Camara de muerte mientras el jugador local esta muerto. */
   private deathCam: DeathCamera | null = null;
   /** FOV actual de la camara, que se mueve al apuntar. */
@@ -235,6 +243,7 @@ export class Game {
       yaw: state.yaw,
       pitch: state.pitch,
       dt: TICK_DT,
+      slot: state.slot,
     };
     // El cliente aplica la misma restriccion de fase que el servidor; si no,
     // predeciria movimiento durante la congelacion y habria que corregirlo.
@@ -246,7 +255,9 @@ export class Game {
     if (events.shot) {
       this.onLocalShot(events.shot.yaw, events.shot.pitch, events.shot.shotIndex);
     }
-    if (events.jumped) this.audio.play('jump');
+    // Dos sonidos distintos para el salto: el jugador sabe si encadeno sin
+    // tener que mirar el marcador de velocidad.
+    if (events.jumped) this.audio.play(events.bhop ? 'bhop' : 'jump');
     if (events.landed && events.landingSpeed > 200) this.audio.play('land');
     if (events.startedReload) this.audio.play('reload');
     if (events.switchedWeapon) this.audio.play('reload');
@@ -258,6 +269,39 @@ export class Game {
     this.punchYaw *= recovery;
 
     this.updateFootsteps(TICK_DT);
+    this.updateBhopCue();
+  }
+
+  /**
+   * Aviso anticipado para encadenar saltos.
+   *
+   * Suena *antes* de tocar suelo, no al aterrizar, y esa es toda la gracia: la
+   * ventana de bhop dura 150 ms, asi que un aviso posterior solo serviria de
+   * metronomo y no de senal a la que reaccionar. Con `BHOP_CUE_LEAD` de
+   * antelacion, pulsar al oirlo cae dentro de la ventana.
+   *
+   * Vive en el cliente y no en la simulacion porque no cambia nada del juego:
+   * es informacion, y se calcula sobre el jugador predicho para que llegue sin
+   * el retraso de la red.
+   */
+  private updateBhopCue(): void {
+    const player = this.prediction?.player;
+    if (!player || !player.alive) return;
+
+    if (player.onGround) {
+      this.bhopCueArmed = true;
+      return;
+    }
+    if (!this.bhopCueArmed || !this.settings.bhopCue) return;
+    // Andando o cayendo despacio no hay cadena que mantener, y el aviso solo
+    // seria un pitido mas en cada bordillo.
+    if (length2D(player.vel) < BHOP_CUE_MIN_SPEED) return;
+
+    const remaining = timeToLanding(player, this.world);
+    if (remaining === null || remaining > BHOP_CUE_LEAD) return;
+
+    this.audio.play('bhopCue');
+    this.bhopCueArmed = false;
   }
 
   /** Efectos inmediatos del propio disparo, sin esperar al servidor. */
@@ -274,7 +318,11 @@ export class Game {
       .map((p) => ({ id: p.id, pos: p.pos, ducking: p.ducking }));
     const result = traceHitscan(this.world, targets, origin, dir, weapon.range);
 
-    this.effects.addTracer(this.muzzlePosition(origin, dir), result.endPos, weapon.tracerColor);
+    // El cuchillo no deja trazador: una raya de 76 unidades delante de la cara
+    // no informa de nada y solo ensucia la pantalla.
+    if (!weapon.melee) {
+      this.effects.addTracer(this.muzzlePosition(origin, dir), result.endPos, weapon.tracerColor);
+    }
     if (result.hitWorld) this.effects.addImpact(result.endPos, result.normal);
 
     this.audio.play(weapon.id);
@@ -503,7 +551,7 @@ export class Game {
           const from = vec3(event.ox, event.oy, event.oz);
           const to = vec3(event.ex, event.ey, event.ez);
           const weapon = getWeapon(event.weapon);
-          this.effects.addTracer(from, to, weapon.tracerColor);
+          if (!weapon.melee) this.effects.addTracer(from, to, weapon.tracerColor);
           this.audio.play(event.weapon, from);
           break;
         }

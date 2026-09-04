@@ -114,6 +114,20 @@ const buildWeapon = (weapon: WeaponId): Group => {
     const stock = part(2.4, 3.2, 9, bodyColor, edge);
     stock.position.set(0, -0.6, 9);
     group.add(receiver, barrel, scope, scopeMount, bolt, stock);
+  } else if (weapon === 'knife') {
+    // Silueta larga y plana: lo que tiene que leerse de un vistazo es que en la
+    // mano no hay canon, porque de eso depende saber que no se puede responder.
+    // Hoja ancha y alta, mango corto: en aristas de neon una hoja fina se ve
+    // de canto y desaparece, y lo unico que hay que leer aqui es que no hay canon.
+    const blade = part(0.9, 3.4, 17, bodyColor, edge);
+    blade.position.set(0, 1.8, -10);
+    blade.rotation.x = -0.1;
+    const guard = part(3.2, 1, 1.2, bodyColor, edge);
+    guard.position.set(0, 0.3, -0.8);
+    const grip = part(1.6, 2, 6, bodyColor, edge);
+    grip.position.set(0, -0.9, 2.6);
+    grip.rotation.x = 0.16;
+    group.add(blade, guard, grip);
   } else if (weapon === 'rifle') {
     const receiver = part(3, 3.2, 13, bodyColor, edge);
     receiver.position.set(0, 0, -2);

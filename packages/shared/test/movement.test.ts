@@ -13,6 +13,8 @@ import {
   FOOTSTEP_MIN_SPEED,
   GRAVITY,
   JUMP_IMPULSE,
+  JUMP_SPEED_CAP,
+  LAND_SPEED_PENALTY,
   MAX_SPEED,
   TICK_DT,
 } from '../src/constants.js';
@@ -26,6 +28,7 @@ import {
   createMoveState,
   eyeHeight,
   moveStep,
+  timeToLanding,
   wishDirection,
 } from '../src/movement.js';
 import { brush, cmd, flatWorld } from './helpers.js';
@@ -188,12 +191,157 @@ describe('salto', () => {
     expect(jumps).toBe(0);
   });
 
-  it('recorta la velocidad al saltar por encima del tope de bunnyhop', () => {
+  it('recorta la velocidad al saltar fuera de la ventana de encadenado', () => {
     const state = groundedState();
+    // Medio segundo quieto: la ventana de bhop ya se ha pasado de largo.
+    for (let i = 0; i < 32; i++) moveStep(state, cmd(0), world);
     state.vel = vec3(600, 0, 0);
+
     const events = moveStep(state, cmd(BUTTON.JUMP), world);
     expect(events.jumped).toBe(true);
-    expect(length2D(state.vel)).toBeLessThanOrEqual(MAX_SPEED * 1.1 + 1);
+    expect(events.bhop).toBe(false);
+    expect(length2D(state.vel)).toBeLessThanOrEqual(JUMP_SPEED_CAP + 1);
+  });
+
+  it('aterrizar emite el evento una sola vez y con la velocidad de caida', () => {
+    const state = createMoveState(vec3(0, 0, 600));
+    let landings = 0;
+    let speed = 0;
+    for (let i = 0; i < 200; i++) {
+      const events = moveStep(state, cmd(0), world);
+      if (events.landed) {
+        landings++;
+        speed = events.landingSpeed;
+      }
+    }
+    expect(landings).toBe(1);
+    // Caida libre de ~600 unidades: sqrt(2 * g * h) ronda los 980 u/s.
+    expect(speed).toBeGreaterThan(900);
+  });
+
+  it('una caida fuerte recorta la velocidad horizontal al tocar suelo', () => {
+    const state = createMoveState(vec3(0, 0, 600));
+    state.vel = vec3(MAX_SPEED, 0, 0);
+    for (let i = 0; i < 200; i++) {
+      if (moveStep(state, cmd(0), world).landed) break;
+    }
+    expect(length2D(state.vel)).toBeCloseTo(MAX_SPEED * LAND_SPEED_PENALTY, 0);
+  });
+});
+
+describe('bunnyhop', () => {
+  /**
+   * Encadena saltos con air-strafe y devuelve la velocidad final.
+   *
+   * `delay` son los ticks que se espera en el suelo antes de volver a saltar:
+   * es exactamente la variable que decide si el salto entra en la ventana, que
+   * es lo que el jugador esta aprendiendo a acertar.
+   */
+  const chain = (hops: number, delay: number, weaponSpeed = 1): number => {
+    const state = groundedState();
+    for (let i = 0; i < 64; i++) {
+      moveStep(state, cmd(BUTTON.FORWARD), world, weaponSpeed);
+    }
+
+    let yaw = 0;
+    let waited = 0;
+    let jumps = 0;
+    for (let i = 0; i < 1200 && jumps < hops; i++) {
+      let buttons = 0;
+      if (state.onGround) {
+        if (waited >= delay) buttons = BUTTON.JUMP;
+        waited++;
+      } else {
+        // Girar hacia el lado que se pulsa: de ahi sale la ganancia del aire.
+        yaw -= 0.8;
+        buttons = BUTTON.RIGHT;
+        waited = 0;
+      }
+      if (moveStep(state, cmd(buttons, yaw), world, weaponSpeed).jumped) jumps++;
+    }
+    return length2D(state.vel);
+  };
+
+  it('encadenar a tiempo acumula velocidad muy por encima de la carrera', () => {
+    expect(chain(8, 0)).toBeGreaterThan(MAX_SPEED * 1.3);
+  });
+
+  it('la ventana perdona un retraso pequeno', () => {
+    // Cuatro ticks son 62 ms: dentro de los 150 ms de ventana.
+    expect(chain(8, 4)).toBeGreaterThan(MAX_SPEED);
+  });
+
+  it('llegar tarde rompe la cadena', () => {
+    // Doce ticks son 187 ms: fuera. La friccion se come lo ganado en el aire.
+    expect(chain(8, 12)).toBeLessThan(MAX_SPEED * 0.6);
+  });
+
+  it('el techo de la cadena respeta el peso del arma', () => {
+    // Si el techo fuese absoluto, cruzar el mapa con la sniper costaria lo
+    // mismo que con el cuchillo y las armas dejarian de pesar.
+    expect(chain(14, 0, 0.72)).toBeLessThan(chain(14, 0, 1.16) * 0.8);
+  });
+
+  it('solo se anuncia como bhop el salto que entra en la ventana', () => {
+    const state = groundedState();
+    for (let i = 0; i < 64; i++) moveStep(state, cmd(BUTTON.FORWARD), world);
+
+    const tardio = moveStep(state, cmd(BUTTON.FORWARD | BUTTON.JUMP), world);
+    expect(tardio.jumped).toBe(true);
+    expect(tardio.bhop).toBe(false);
+
+    let guard = 0;
+    while (!state.onGround && guard++ < 200) {
+      moveStep(state, cmd(BUTTON.FORWARD), world);
+    }
+    const encadenado = moveStep(state, cmd(BUTTON.FORWARD | BUTTON.JUMP), world);
+    expect(encadenado.jumped).toBe(true);
+    expect(encadenado.bhop).toBe(true);
+  });
+
+  it('saltar a tiempo pero parado no cuenta como cadena', () => {
+    const state = groundedState();
+    let guard = 0;
+    moveStep(state, cmd(BUTTON.JUMP), world);
+    while (!state.onGround && guard++ < 200) moveStep(state, cmd(0), world);
+
+    const events = moveStep(state, cmd(BUTTON.JUMP), world);
+    expect(events.jumped).toBe(true);
+    expect(events.bhop).toBe(false);
+  });
+});
+
+describe('timeToLanding', () => {
+  it('con los pies en el suelo o subiendo no hay nada que predecir', () => {
+    const state = groundedState();
+    expect(timeToLanding(state, world)).toBeNull();
+
+    moveStep(state, cmd(BUTTON.JUMP), world);
+    expect(state.vel.z).toBeGreaterThan(0);
+    expect(timeToLanding(state, world)).toBeNull();
+  });
+
+  it('predice el aterrizaje con la precision suficiente para avisar', () => {
+    const state = groundedState();
+    moveStep(state, cmd(BUTTON.JUMP), world);
+    let guard = 0;
+    while (state.vel.z > 0 && guard++ < 200) moveStep(state, cmd(0), world);
+
+    const previsto = timeToLanding(state, world);
+    expect(previsto).not.toBeNull();
+
+    let ticks = 0;
+    for (let i = 0; i < 200; i++) {
+      ticks++;
+      if (moveStep(state, cmd(0), world).landed) break;
+    }
+    expect(ticks * TICK_DT).toBeCloseTo(previsto!, 1);
+  });
+
+  it('sin suelo al alcance no se inventa una prediccion', () => {
+    const state = createMoveState(vec3(0, 0, 4000));
+    state.vel = vec3(0, 0, -10);
+    expect(timeToLanding(state, world)).toBeNull();
   });
 });
 

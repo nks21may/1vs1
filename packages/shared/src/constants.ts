@@ -31,6 +31,37 @@ export const MAX_GROUND_NORMAL_Z = 0.7;
 export const LAND_SPEED_PENALTY = 0.85;
 export const LAND_PENALTY_MIN_FALL_SPEED = 580;
 
+// --- Bunnyhop ---
+/**
+ * Ventana, en segundos, entre tocar suelo y volver a saltar para que el salto
+ * cuente como encadenado.
+ *
+ * Es el nucleo del bhop: la velocidad ganada en el aire solo sobrevive si el
+ * salto sale a tiempo, asi que lo que se premia es el ritmo. Sigue haciendo
+ * falta soltar la tecla entre saltos (`jumpHeld`), de modo que mantener espacio
+ * pulsado no encadena nada.
+ */
+export const BHOP_WINDOW = 0.15;
+/** Tope de velocidad al saltar fuera de la ventana: corta la cadena en seco. */
+export const JUMP_SPEED_CAP = MAX_SPEED * 1.1;
+/**
+ * Techo encadenando saltos, como multiplo de la velocidad de carrera del arma
+ * que se lleve. Es relativo y no absoluto a proposito: con un techo fijo, el
+ * bhop borraria de un plumazo los multiplicadores de velocidad de las armas y
+ * cruzar el mapa con la sniper costaria lo mismo que con el cuchillo.
+ */
+export const BHOP_SPEED_RATIO = 1.7;
+/**
+ * Antelacion del aviso sonoro respecto al aterrizaje previsto. Esta calibrada
+ * para que el jugador *reaccione* al aviso y no lo use solo de metronomo: con
+ * 130 ms de margen y una ventana de 150 ms valen las reacciones de 130 a 280 ms.
+ */
+export const BHOP_CUE_LEAD = 0.13;
+/** Por debajo de esta velocidad el aviso calla: no hay cadena que mantener. */
+export const BHOP_CUE_MIN_SPEED = MAX_SPEED * 0.5;
+/** Caida maxima que se mira hacia abajo al predecir el aterrizaje. */
+export const BHOP_CUE_MAX_DROP = 640;
+
 // --- Dimensiones del jugador (origen en los pies) ---
 export const PLAYER_HALF_WIDTH = 16;
 export const PLAYER_HEIGHT_STANDING = 72;
@@ -100,10 +131,18 @@ export const BUTTON = {
   ATTACK: 1 << 6,
   RELOAD: 1 << 7,
   WALK: 1 << 8,
-  SWITCH: 1 << 9,
   /** Apuntar con mira. Va en el comando para que el servidor pueda validarlo. */
-  AIM: 1 << 10,
+  AIM: 1 << 9,
 } as const;
+
+/**
+ * Botones de *postura*: describen algo que el jugador mantiene, no una accion
+ * puntual. La distincion importa cuando el servidor se queda sin comandos y
+ * tiene que inventarse uno: borrar las acciones es correcto (nadie quiere
+ * disparar en tu nombre), pero borrar la postura no, porque el cliente sigue
+ * agachado en su pantalla y las dos simulaciones se separan.
+ */
+export const HELD_BUTTONS = BUTTON.DUCK | BUTTON.WALK | BUTTON.AIM;
 
 export type ButtonMask = number;
 

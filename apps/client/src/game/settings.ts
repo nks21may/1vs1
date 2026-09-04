@@ -17,6 +17,11 @@ export interface Settings {
   bloom: boolean;
   volume: number;
   showNetGraph: boolean;
+  /**
+   * Aviso sonoro que anticipa el aterrizaje para encadenar saltos. Es opcional
+   * porque suena en cada caida y hay quien prefiere el ritmo a oido.
+   */
+  bhopCue: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -27,6 +32,7 @@ export const DEFAULT_SETTINGS: Settings = {
   bloom: true,
   volume: 0.6,
   showNetGraph: true,
+  bhopCue: true,
 };
 
 const STORAGE_KEY = 'neonduel.settings.v1';
@@ -57,6 +63,7 @@ export const sanitizeSettings = (raw: unknown): Settings => {
     bloom: asBoolean(data.bloom, DEFAULT_SETTINGS.bloom),
     volume: clampNumber(data.volume, 0, 1, DEFAULT_SETTINGS.volume),
     showNetGraph: asBoolean(data.showNetGraph, DEFAULT_SETTINGS.showNetGraph),
+    bhopCue: asBoolean(data.bhopCue, DEFAULT_SETTINGS.bhopCue),
   };
 };
 

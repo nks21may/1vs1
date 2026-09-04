@@ -24,6 +24,7 @@ import {
   computeShotAngles,
   computeSpread,
   getWeapon,
+  weaponForSlot,
   weaponSpeedMultiplier,
   shotSeed,
 } from './weapons.js';
@@ -48,8 +49,6 @@ export interface PlayerState extends MoveState {
   shotCounter: number;
   /** True mientras el boton de disparo siga pulsado (armas semiautomaticas). */
   attackHeld: boolean;
-  /** True mientras el boton de cambio de arma siga pulsado. */
-  switchHeld: boolean;
   /**
    * True mientras el jugador esta apuntando con mira. Es estado simulado y no
    * un adorno del cliente: de el dependen la velocidad y la dispersion, asi que
@@ -57,12 +56,6 @@ export interface PlayerState extends MoveState {
    */
   aiming: boolean;
 }
-
-/** Orden del ciclo de armas. Cambiar de arma va siempre hacia delante. */
-const WEAPON_CYCLE: readonly WeaponId[] = ['rifle', 'pistol', 'sniper'];
-
-const nextWeapon = (current: WeaponId): WeaponId =>
-  WEAPON_CYCLE[(WEAPON_CYCLE.indexOf(current) + 1) % WEAPON_CYCLE.length]!;
 
 /** Disparo generado por la simulacion; el servidor lo resuelve con hitscan. */
 export interface ShotRequest {
@@ -82,6 +75,17 @@ export interface PlayerTickEvents extends MoveEvents {
   emptyClick: boolean;
 }
 
+/**
+ * Cargadores llenos al empezar la ronda. El cuchillo entra con un cero que
+ * nadie lee: al ser cuerpo a cuerpo, ni gasta ni recarga.
+ */
+const fullMagazines = (): Record<WeaponId, number> => ({
+  rifle: getWeapon('rifle').magazine,
+  pistol: getWeapon('pistol').magazine,
+  knife: 0,
+  sniper: getWeapon('sniper').magazine,
+});
+
 export const createPlayer = (
   id: number,
   name: string,
@@ -98,21 +102,17 @@ export const createPlayer = (
   ducking: false,
   duckProgress: 0,
   jumpHeld: false,
+  timeSinceLanding: 0,
   health: MAX_HEALTH,
   alive: true,
   weapon: 'rifle',
-  ammo: {
-    rifle: getWeapon('rifle').magazine,
-    pistol: getWeapon('pistol').magazine,
-    sniper: getWeapon('sniper').magazine,
-  },
+  ammo: fullMagazines(),
   fireCooldown: 0,
   reloadRemaining: 0,
   shotIndex: 0,
   timeSinceShot: 999,
   shotCounter: 0,
   attackHeld: false,
-  switchHeld: false,
   aiming: false,
 });
 
@@ -126,20 +126,16 @@ export const respawnPlayer = (player: PlayerState, pos: Vec3, yaw: number): void
   player.ducking = false;
   player.duckProgress = 0;
   player.jumpHeld = false;
+  player.timeSinceLanding = 0;
   player.health = MAX_HEALTH;
   player.alive = true;
   player.weapon = 'rifle';
-  player.ammo = {
-    rifle: getWeapon('rifle').magazine,
-    pistol: getWeapon('pistol').magazine,
-    sniper: getWeapon('sniper').magazine,
-  };
+  player.ammo = fullMagazines();
   player.fireCooldown = 0;
   player.reloadRemaining = 0;
   player.shotIndex = 0;
   player.timeSinceShot = 999;
   player.attackHeld = false;
-  player.switchHeld = false;
   player.aiming = false;
 };
 
@@ -147,6 +143,7 @@ const emptyEvents = (): PlayerTickEvents => ({
   jumped: false,
   landed: false,
   landingSpeed: 0,
+  bhop: false,
   shot: null,
   startedReload: false,
   finishedReload: false,
@@ -159,7 +156,7 @@ export const canFire = (player: PlayerState): boolean =>
   player.alive &&
   player.fireCooldown <= 0 &&
   player.reloadRemaining <= 0 &&
-  player.ammo[player.weapon] > 0;
+  (getWeapon(player.weapon).melee || player.ammo[player.weapon] > 0);
 
 const startReload = (player: PlayerState): boolean => {
   const weapon = getWeapon(player.weapon);
@@ -204,15 +201,17 @@ export const simulatePlayerTick = (
   }
 
   // --- Cambio de arma ---
-  const switchPressed = hasButton(cmd.buttons, BUTTON.SWITCH);
-  if (switchPressed && !player.switchHeld) {
-    player.weapon = nextWeapon(player.weapon);
+  // Una ranura por arma, y la peticion es idempotente: pedir el arma que ya se
+  // lleva no hace nada, asi que mantener la tecla pulsada no encadena cambios y
+  // no hace falta detectar el flanco de la pulsacion.
+  const requested = cmd.slot ? weaponForSlot(cmd.slot) : null;
+  if (requested !== null && requested !== player.weapon) {
+    player.weapon = requested;
     player.reloadRemaining = 0;
     player.shotIndex = 0;
     player.fireCooldown = Math.max(player.fireCooldown, 0.25);
     events.switchedWeapon = true;
   }
-  player.switchHeld = switchPressed;
 
   const weapon = getWeapon(player.weapon);
 
@@ -266,12 +265,13 @@ export const simulatePlayerTick = (
         seed,
       };
 
-      player.ammo[player.weapon] -= 1;
+      if (!weapon.melee) player.ammo[player.weapon] -= 1;
       player.fireCooldown = weapon.cycleTime;
       player.shotIndex += 1;
       player.shotCounter += 1;
       player.timeSinceShot = 0;
     } else if (
+      !weapon.melee &&
       player.ammo[player.weapon] === 0 &&
       player.reloadRemaining === 0 &&
       player.fireCooldown <= 0
@@ -288,6 +288,7 @@ export const simulatePlayerTick = (
   events.jumped = moveEvents.jumped;
   events.landed = moveEvents.landed;
   events.landingSpeed = moveEvents.landingSpeed;
+  events.bhop = moveEvents.bhop;
 
   return events;
 };
@@ -306,7 +307,7 @@ export const applyPhaseRestrictions = (
 ): UserCommand => {
   if (!frozen) return cmd;
   // Solo sobreviven las teclas que no alteran la posicion ni el estado del arma.
-  return { ...cmd, buttons: cmd.buttons & BUTTON.DUCK };
+  return { ...cmd, buttons: cmd.buttons & BUTTON.DUCK, slot: 0 };
 };
 
 /** Aplica dano y devuelve true si el golpe fue letal. */

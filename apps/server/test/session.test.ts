@@ -153,6 +153,41 @@ describe('procesado de comandos', () => {
     ticks(session, 20);
     expect(player.pos.z).toBeLessThan(startZ);
   });
+
+  /**
+   * El bug que fija este test: al quedarse sin comandos el servidor repetia el
+   * ultimo con `buttons: 0`, asi que levantaba a un jugador que seguia agachado
+   * en su pantalla. Como los huecos son constantes con el jitter normal de la
+   * red, la velocidad maxima simulada saltaba de 73 a 215 u/s varias veces por
+   * segundo y la correccion resultante sacudia la camara.
+   */
+  it('sin comandos nuevos conserva la postura en vez de levantar al jugador', () => {
+    const { session } = newSession();
+    goLive(session);
+
+    session.handleMessage(1, input([cmd(1, BUTTON.DUCK)]));
+    ticks(session, 30);
+
+    const player = session.playerOf(1)!;
+    expect(player.ducking).toBe(true);
+    expect(player.duckProgress).toBe(1);
+  });
+
+  it('sin comandos nuevos no dispara ni avanza en nombre del cliente', () => {
+    const { session, a } = newSession();
+    goLive(session);
+
+    session.handleMessage(1, input([cmd(1, BUTTON.FORWARD | BUTTON.ATTACK)]));
+    const player = session.playerOf(1)!;
+    ticks(session, 1);
+    const after = { x: player.pos.x, y: player.pos.y, ammo: player.ammo.rifle };
+
+    ticks(session, 30);
+    expect(player.ammo.rifle).toBe(after.ammo);
+    // Se frena por friccion; lo que no puede es seguir acelerando solo.
+    expect(Math.hypot(player.pos.x - after.x, player.pos.y - after.y)).toBeLessThan(60);
+    expect(a.last('snapshot')).toBeDefined();
+  });
 });
 
 describe('fases de ronda', () => {
@@ -398,6 +433,22 @@ describe('contenido del snapshot', () => {
     expect(me.flags & SNAPSHOT_FLAG.ALIVE).toBeTruthy();
     expect(me.score).toBe(0);
     expect(me.ammo).toBe(30);
+  });
+
+  it('el progreso de agachado viaja aparte del bit de postura', () => {
+    const { session, a } = newSession();
+    goLive(session);
+
+    // Un solo tick agachado: la transicion dura 0,2 s, asi que el bit todavia
+    // dice "de pie" mientras la camara ya ha empezado a bajar. Si el cliente
+    // tuviese que deducir el progreso del bit, ahi es donde daba el tiron.
+    session.handleMessage(1, input([cmd(1, BUTTON.DUCK)]));
+    ticks(session, 1);
+
+    const me = a.last('snapshot')!.players.find((p) => p.id === 1)!;
+    expect(me.flags & SNAPSHOT_FLAG.DUCKING).toBeFalsy();
+    expect(me.duck).toBeGreaterThan(0);
+    expect(me.duck).toBeLessThan(1);
   });
 
   it('redondea las posiciones para ahorrar ancho de banda', () => {

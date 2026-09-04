@@ -42,6 +42,7 @@ const controls = {
   invertY: byId<HTMLInputElement>('invert-y'),
   bloom: byId<HTMLInputElement>('bloom'),
   netgraph: byId<HTMLInputElement>('netgraph-toggle'),
+  bhopCue: byId<HTMLInputElement>('bhop-cue'),
 };
 
 const labels = {
@@ -64,6 +65,7 @@ const syncControls = (): void => {
   controls.invertY.checked = settings.invertY;
   controls.bloom.checked = settings.bloom;
   controls.netgraph.checked = settings.showNetGraph;
+  controls.bhopCue.checked = settings.bhopCue;
 
   labels.sensitivity.textContent = settings.sensitivity.toFixed(2);
   labels.fov.textContent = String(Math.round(settings.fov));
@@ -94,6 +96,9 @@ controls.bloom.addEventListener('change', () => {
 });
 controls.netgraph.addEventListener('change', () => {
   updateSettings({ showNetGraph: controls.netgraph.checked });
+});
+controls.bhopCue.addEventListener('change', () => {
+  updateSettings({ bhopCue: controls.bhopCue.checked });
 });
 nameInput.addEventListener('change', () => {
   updateSettings({ name: nameInput.value.trim() || 'JUGADOR' });

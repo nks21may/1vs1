@@ -18,6 +18,7 @@ import {
   type PlayerState,
   type UserCommand,
   createPlayer,
+  eyePosition,
   simulatePlayerTick,
   vec3,
 } from '@neonduel/shared';
@@ -54,11 +55,55 @@ const snapshotOf = (player: PlayerState): PlayerSnapshot => ({
     (player.ducking ? SNAPSHOT_FLAG.DUCKING : 0) |
     (player.onGround ? SNAPSHOT_FLAG.ON_GROUND : 0) |
     (player.alive ? SNAPSHOT_FLAG.ALIVE : 0),
+  duck: player.duckProgress,
   health: player.health,
   weapon: player.weapon,
   ammo: player.ammo[player.weapon],
   reload: 0,
   score: 0,
+});
+
+describe('agacharse', () => {
+  /** Cliente y servidor a medio agachar, con la misma secuencia de comandos. */
+  const halfDucked = () => {
+    const prediction = new PredictionSystem(spawn(), ATRIUM_WORLD);
+    const server = spawn();
+    let seq = 0;
+    const step = (buttons: number) => {
+      seq += 1;
+      const command = cmd(seq, buttons);
+      prediction.apply(command);
+      simulatePlayerTick(server, command, ATRIUM_WORLD);
+    };
+
+    // El spawn esta a 8 unidades del suelo: hay que posarse antes, o agacharse
+    // en el aire es instantaneo (duck-jump) y no hay transicion que mirar.
+    for (let i = 0; i < 16; i++) step(0);
+    for (let i = 0; i < 6; i++) step(BUTTON.DUCK);
+    return { prediction, server, lastSeq: seq };
+  };
+
+  it('la transicion existe: ni de pie ni agachado del todo', () => {
+    const { server } = halfDucked();
+    expect(server.ducking).toBe(false);
+    expect(server.duckProgress).toBeGreaterThan(0);
+    expect(server.duckProgress).toBeLessThan(1);
+  });
+
+  it('corregir la posicion no mueve la camara de golpe', () => {
+    const { prediction, server, lastSeq } = halfDucked();
+    const antes = eyePosition(prediction.player).z - prediction.player.pos.z;
+
+    // Error suficiente para que la reconciliacion adopte el estado del servidor.
+    server.pos.x += 5;
+    prediction.reconcile(snapshotOf(server), lastSeq);
+    const despues = eyePosition(prediction.player).z - prediction.player.pos.z;
+
+    // Antes el progreso se deducia del bit `DUCKING` y saltaba a 0 o a 1: eso
+    // eran 18 unidades de camara en un solo fotograma, varias veces por segundo.
+    expect(Math.abs(despues - antes)).toBeLessThan(1);
+    expect(prediction.player.duckProgress).toBeCloseTo(server.duckProgress, 5);
+  });
 });
 
 describe('prediccion', () => {
