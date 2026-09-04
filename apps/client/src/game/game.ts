@@ -18,6 +18,7 @@ import {
   TICK_DT,
   type UserCommand,
   type Vec3,
+  type WeaponDef,
   advanceFootstep,
   accuracy,
   applyPhaseRestrictions,
@@ -29,6 +30,7 @@ import {
   getWeapon,
   length2D,
   maxSpeedFor,
+  weaponSpeedMultiplier,
   shotDirection,
   traceHitscan,
   vec3,
@@ -50,7 +52,7 @@ import {
 import { InputManager } from './input.js';
 import { NetClient, type ConnectionStatus, buildServerUrl } from './net.js';
 import { PredictionSystem } from './prediction.js';
-import type { Settings } from './settings.js';
+import { DEFAULT_SETTINGS, type Settings } from './settings.js';
 import type { StatsRow } from '../hud.js';
 
 export interface GameCallbacks {
@@ -94,6 +96,8 @@ export class Game {
   private readonly footsteps = createFootstepTracker();
   /** Camara de muerte mientras el jugador local esta muerto. */
   private deathCam: DeathCamera | null = null;
+  /** FOV actual de la camara, que se mueve al apuntar. */
+  private fov = DEFAULT_SETTINGS.fov;
   private fps = 60;
   private settings: Settings;
 
@@ -129,7 +133,10 @@ export class Game {
     this.settings = settings;
     this.input.sensitivity = settings.sensitivity;
     this.input.invertY = settings.invertY;
-    this.render.setFov(settings.fov);
+    // Cambiar el ajuste con la mira puesta no debe tirar del zoom: solo se
+    // salta al valor nuevo si no se esta apuntando.
+    if (!this.prediction?.player.aiming) this.fov = settings.fov;
+    this.render.setFov(this.fov);
     this.render.setBloomEnabled(settings.bloom);
     this.audio.setVolume(settings.volume);
     this.hud.setNetGraphVisible(settings.showNetGraph);
@@ -255,7 +262,7 @@ export class Game {
     this.effects.addTracer(this.muzzlePosition(origin, dir), result.endPos, weapon.tracerColor);
     if (result.hitWorld) this.effects.addImpact(result.endPos, result.normal);
 
-    this.audio.play(weapon.id === 'rifle' ? 'rifle' : 'pistol');
+    this.audio.play(weapon.id);
     this.viewModel.punch(1);
 
     // El retroceso visual es una fraccion del patron: la mira sube menos que la
@@ -331,7 +338,12 @@ export class Game {
 
     const weapon = getWeapon(player.weapon);
     const speed = length2D(player.vel);
-    const maxSpeed = maxSpeedFor(0, player.ducking, weapon.speedMultiplier);
+    const maxSpeed = maxSpeedFor(
+      0,
+      player.ducking,
+      weaponSpeedMultiplier(weapon, player.aiming),
+    );
+    this.updateZoom(weapon, player.aiming, dt);
 
     this.viewModel.setWeapon(player.weapon);
     this.viewModel.update({
@@ -358,10 +370,10 @@ export class Game {
 
     const spread = computeSpread(
       weapon,
-      { speed, onGround: player.onGround, ducking: player.ducking },
+      { speed, onGround: player.onGround, ducking: player.ducking, aiming: player.aiming },
       maxSpeed,
     );
-    this.hud.setSpread(spread, this.settings.fov, window.innerHeight);
+    this.hud.setSpread(spread, this.fov, window.innerHeight);
     this.hud.setHealth(health);
     this.hud.setSpeed(speed, 250);
     this.hud.setWeapon(
@@ -390,6 +402,22 @@ export class Game {
       this.hud.showStats(showing);
       if (showing) this.hud.setStats(this.statsRows(snapshot));
     }
+  }
+
+  /**
+   * Acerca el FOV al del arma cuando se apunta y lo devuelve al soltar. El
+   * zoom se suaviza solo para la vista: la simulacion ya considera que se
+   * apunta desde el primer tick, asi que la precision no depende de la
+   * animacion.
+   */
+  private updateZoom(weapon: WeaponDef, aiming: boolean, dt: number): void {
+    const objetivo = aiming && weapon.aim ? weapon.aim.fov : this.settings.fov;
+    this.fov += (objetivo - this.fov) * (1 - Math.exp(-18 * Math.min(dt, 1)));
+    if (Math.abs(this.fov - objetivo) < 0.05) this.fov = objetivo;
+    this.render.setFov(this.fov);
+    // La sensibilidad sigue al zoom real y no al objetivo: durante la
+    // transicion tambien tiene que responder a lo que se ve.
+    this.input.setZoomFactor(this.fov / this.settings.fov);
   }
 
   /** Las filas del marcador, con el jugador local siempre el primero. */
@@ -449,7 +477,7 @@ export class Game {
           const to = vec3(event.ex, event.ey, event.ez);
           const weapon = getWeapon(event.weapon);
           this.effects.addTracer(from, to, weapon.tracerColor);
-          this.audio.play(event.weapon === 'rifle' ? 'rifle' : 'pistol', from);
+          this.audio.play(event.weapon, from);
           break;
         }
 

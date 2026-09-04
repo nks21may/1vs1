@@ -12,7 +12,7 @@
 
 import { createRandom, degToRad, hashSeed } from './math.js';
 
-export type WeaponId = 'rifle' | 'pistol';
+export type WeaponId = 'rifle' | 'pistol' | 'sniper';
 export type FireMode = 'auto' | 'semi';
 
 export interface SpreadProfile {
@@ -24,6 +24,20 @@ export interface SpreadProfile {
   air: number;
   /** Multiplicador al ir agachado (< 1 = mas preciso). */
   duckingMultiplier: number;
+}
+
+/**
+ * Apuntado con mira. Solo lo tienen las armas pensadas para el angulo largo:
+ * es un intercambio explicito, precision a cambio de movilidad y de vision
+ * periferica, no una mejora gratuita que convenga tener siempre puesta.
+ */
+export interface AimProfile {
+  /** Campo de vision al apuntar, en grados. */
+  readonly fov: number;
+  /** Multiplicador de velocidad mientras se apunta. */
+  readonly speedMultiplier: number;
+  /** Multiplicador de dispersion al apuntar. */
+  readonly spreadMultiplier: number;
 }
 
 export interface WeaponDef {
@@ -56,6 +70,8 @@ export interface WeaponDef {
   readonly viewPunchRecovery: number;
   /** Color del trazador, en hexadecimal, para el cliente. */
   readonly tracerColor: number;
+  /** Perfil de apuntado, o `null` si el arma no tiene mira. */
+  readonly aim: AimProfile | null;
 }
 
 /**
@@ -129,6 +145,7 @@ export const RIFLE: WeaponDef = {
   viewPunchRatio: 0.35,
   viewPunchRecovery: 9,
   tracerColor: 0x6ff7ff,
+  aim: null,
 };
 
 export const PISTOL: WeaponDef = {
@@ -151,14 +168,73 @@ export const PISTOL: WeaponDef = {
   viewPunchRatio: 0.4,
   viewPunchRecovery: 11,
   tracerColor: 0xff8ad8,
+  aim: null,
+};
+
+/**
+ * Patron minimo: un arma de un disparo no tiene spray que aprender, pero el
+ * primer tiro tiene que salir exacto igual que en el resto.
+ */
+const buildSniperPattern = (shots: number): (readonly [number, number])[] => {
+  const pattern: (readonly [number, number])[] = [];
+  let pitch = 0;
+  for (let i = 0; i < shots; i++) {
+    pattern.push([0, Math.round(pitch * 1000) / 1000] as const);
+    pitch += 2.6;
+  }
+  return pattern;
+};
+
+export const SNIPER: WeaponDef = {
+  id: 'sniper',
+  name: 'LONGWAVE',
+  mode: 'semi',
+  // Un segundo entre tiros: fallar se paga, que es lo que obliga a elegir el
+  // momento en vez de insistir.
+  cycleTime: 1,
+  damage: 115,
+  // Ya mata de un tiro al cuerpo: el multiplicador de cabeza solo evita que
+  // una cabeza cuente menos que un torso.
+  headshotMultiplier: 1.2,
+  legMultiplier: 0.6,
+  magazine: 5,
+  reloadTime: 3.2,
+  // Pesa: con ella encima se corre bastante menos que con el rifle.
+  speedMultiplier: 0.72,
+  // Sin apuntar es un arma inservible a media distancia, a proposito.
+  spread: { base: 3.4, moving: 7, air: 12, duckingMultiplier: 0.9 },
+  range: 12288,
+  // Sin caida de dano util: es justo el arma del angulo largo.
+  falloffStart: 6000,
+  falloffPer1000: 0.05,
+  recoilPattern: buildSniperPattern(5),
+  recoilResetTime: 1.1,
+  viewPunchRatio: 0.8,
+  viewPunchRecovery: 5,
+  tracerColor: 0xffe27a,
+  aim: {
+    fov: 28,
+    // Apuntar clava al jugador casi en el sitio: es la mitad cara del trato.
+    speedMultiplier: 0.42,
+    // Y la otra mitad: quieto y apuntando, va donde se apunta.
+    spreadMultiplier: 0.012,
+  },
 };
 
 export const WEAPONS: Readonly<Record<WeaponId, WeaponDef>> = {
   rifle: RIFLE,
   pistol: PISTOL,
+  sniper: SNIPER,
 };
 
 export const getWeapon = (id: WeaponId): WeaponDef => WEAPONS[id];
+
+/**
+ * Multiplicador de velocidad del arma, contando el apuntado. Apuntar solo
+ * frena si el arma tiene mira: pulsar el boton con la pistola no hace nada.
+ */
+export const weaponSpeedMultiplier = (weapon: WeaponDef, aiming: boolean): number =>
+  aiming && weapon.aim ? weapon.speedMultiplier * weapon.aim.speedMultiplier : weapon.speedMultiplier;
 
 /** Contexto de precision en el instante del disparo. */
 export interface AccuracyContext {
@@ -166,6 +242,7 @@ export interface AccuracyContext {
   speed: number;
   onGround: boolean;
   ducking: boolean;
+  aiming?: boolean;
 }
 
 /**
@@ -178,7 +255,12 @@ export const computeSpread = (
   maxSpeed: number,
 ): number => {
   const speedRatio = maxSpeed > 0 ? Math.min(1, ctx.speed / maxSpeed) : 0;
-  let spread = weapon.spread.base + weapon.spread.moving * speedRatio ** 2;
+  // Apuntar solo afina la dispersion base, no la penalizacion por moverse. Si
+  // la afinase entera, apuntar y correr seguiria siendo puntero fino y el arma
+  // no obligaria a elegir entre controlar el angulo y moverse, que es justo la
+  // decision que la hace interesante.
+  const aiming = ctx.aiming && weapon.aim ? weapon.aim.spreadMultiplier : 1;
+  let spread = weapon.spread.base * aiming + weapon.spread.moving * speedRatio ** 2;
   if (!ctx.onGround) spread += weapon.spread.air;
   if (ctx.ducking) spread *= weapon.spread.duckingMultiplier;
   return spread;

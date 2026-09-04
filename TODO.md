@@ -238,7 +238,7 @@ así se pudra.
 
 ## P2 — Profundidad de juego
 
-- [ ] **T05. Tercera arma con mira (rifle de precisión)**
+- [x] **T05. Tercera arma con mira (rifle de precisión)**
   Dos armas dan poca decisión. Un rifle de un disparo con zoom obliga a elegir
   entre control del ángulo largo y movilidad, que es la tensión que hace
   interesante el mapa.
@@ -247,6 +247,28 @@ así se pudra.
   - Hecho cuando: existe en [weapons.ts](packages/shared/src/weapons.ts) con sus
     tests de daño y dispersión, el zoom es parte del comando de usuario (o el
     servidor no podría validar la precisión) y se predice sin tirones.
+  - **Hecho (2026-09-03).** LONGWAVE: un tiro por pulsación, 1 s de ciclo, 115 de
+    daño (mata al cuerpo, **no a las piernas**), cargador de 5 y sin caída de
+    daño útil. Con ella encima se corre menos que con el rifle (0,72 frente a
+    0,86), y apuntar deja al jugador al 42% de eso.
+  - `BUTTON.AIM` va **en el comando**, y `player.aiming` es estado simulado: el
+    servidor lleva el apuntado por su cuenta y calcula con él la dispersión y la
+    velocidad, así que no hay nada que el cliente pueda afirmar sobre su propia
+    precisión. Cambiar a un arma sin mira lo cancela solo.
+  - **Apuntar afina solo la dispersión base, no la penalización por moverse.** La
+    primera versión multiplicaba el total y dejaba el arma en 0,12° corriendo y
+    apuntando, es decir, puntero fino en movimiento: justo lo contrario de la
+    decisión entre ángulo largo y movilidad que la tarea busca. Con el cambio,
+    quieto y apuntando son 0,04° y en carrera 7°. Hay test de las dos cosas.
+  - La sensibilidad se escala con el zoom real (no con el objetivo), así que
+    también responde bien durante la transición. El suavizado del FOV es solo
+    visual: la simulación considera que se apunta desde el primer tick, o la
+    precisión dependeria de una animación.
+  - El cambio de arma pasa a ser un ciclo de tres. Silueta y sonido propios: la
+    del visor y el cañón largo, y un disparo más grave y con el doble de cola que
+    el del rifle.
+  - Verificado en partida real: el servidor confirma `weapon: sniper`, apuntar
+    lleva el FOV de 74° a 28° y cierra la mira, y no hay errores de consola.
 
 - [ ] **T06. Economía por rondas**
   Ganar o perder una ronda no tiene consecuencia en la siguiente. Un dinero simple

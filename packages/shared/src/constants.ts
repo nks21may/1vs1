@@ -101,6 +101,8 @@ export const BUTTON = {
   RELOAD: 1 << 7,
   WALK: 1 << 8,
   SWITCH: 1 << 9,
+  /** Apuntar con mira. Va en el comando para que el servidor pueda validarlo. */
+  AIM: 1 << 10,
 } as const;
 
 export type ButtonMask = number;

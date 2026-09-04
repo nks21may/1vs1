@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { BUTTON, MAX_HEALTH, TICK_DT } from '../src/constants.js';
-import { vec3 } from '../src/math.js';
+import { length2D, vec3 } from '../src/math.js';
 import {
   applyDamage,
   canFire,
@@ -117,10 +117,15 @@ describe('disparo', () => {
 });
 
 describe('cambio de arma', () => {
-  it('alterna entre rifle y pistola y exige soltar la tecla', () => {
+  it('recorre las tres armas en ciclo y exige soltar la tecla', () => {
     const player = newPlayer();
+    // Mantener pulsado no encadena cambios: cada arma exige una pulsacion.
     run(player, 32, BUTTON.SWITCH);
     expect(player.weapon).toBe('pistol');
+
+    run(player, 32, 0);
+    run(player, 32, BUTTON.SWITCH);
+    expect(player.weapon).toBe('sniper');
 
     run(player, 32, 0);
     run(player, 32, BUTTON.SWITCH);
@@ -209,5 +214,49 @@ describe('determinismo de la simulacion completa', () => {
     expect(a.player.vel).toEqual(b.player.vel);
     expect(a.player.ammo).toEqual(b.player.ammo);
     expect(a.shots).toEqual(b.shots);
+  });
+});
+
+describe('apuntado con mira', () => {
+  it('el boton de apuntar entra en el estado del jugador', () => {
+    const player = newPlayer();
+    player.weapon = 'sniper';
+
+    simulatePlayerTick(player, cmd(BUTTON.AIM), world);
+    expect(player.aiming).toBe(true);
+
+    simulatePlayerTick(player, cmd(0), world);
+    expect(player.aiming).toBe(false);
+  });
+
+  it('con un arma sin mira, apuntar no hace nada', () => {
+    const player = newPlayer();
+    simulatePlayerTick(player, cmd(BUTTON.AIM), world);
+    expect(player.weapon).toBe('rifle');
+    expect(player.aiming).toBe(false);
+  });
+
+  it('cambiar a un arma sin mira cancela el apuntado', () => {
+    const player = newPlayer();
+    player.weapon = 'sniper';
+    simulatePlayerTick(player, cmd(BUTTON.AIM), world);
+    expect(player.aiming).toBe(true);
+
+    // Sigue pulsando apuntar mientras cambia de arma.
+    simulatePlayerTick(player, cmd(BUTTON.AIM | BUTTON.SWITCH), world);
+    expect(player.weapon).toBe('rifle');
+    expect(player.aiming).toBe(false);
+  });
+
+  it('apuntar frena al jugador', () => {
+    const correr = (aiming: boolean) => {
+      const player = newPlayer();
+      player.weapon = 'sniper';
+      player.pos = vec3(0, 0, 0);
+      run(player, 96, BUTTON.FORWARD | (aiming ? BUTTON.AIM : 0));
+      return length2D(player.vel);
+    };
+
+    expect(correr(true)).toBeLessThan(correr(false) * 0.6);
   });
 });

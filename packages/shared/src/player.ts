@@ -24,6 +24,7 @@ import {
   computeShotAngles,
   computeSpread,
   getWeapon,
+  weaponSpeedMultiplier,
   shotSeed,
 } from './weapons.js';
 
@@ -49,7 +50,19 @@ export interface PlayerState extends MoveState {
   attackHeld: boolean;
   /** True mientras el boton de cambio de arma siga pulsado. */
   switchHeld: boolean;
+  /**
+   * True mientras el jugador esta apuntando con mira. Es estado simulado y no
+   * un adorno del cliente: de el dependen la velocidad y la dispersion, asi que
+   * el servidor tiene que llevarlo el mismo para poder validar los disparos.
+   */
+  aiming: boolean;
 }
+
+/** Orden del ciclo de armas. Cambiar de arma va siempre hacia delante. */
+const WEAPON_CYCLE: readonly WeaponId[] = ['rifle', 'pistol', 'sniper'];
+
+const nextWeapon = (current: WeaponId): WeaponId =>
+  WEAPON_CYCLE[(WEAPON_CYCLE.indexOf(current) + 1) % WEAPON_CYCLE.length]!;
 
 /** Disparo generado por la simulacion; el servidor lo resuelve con hitscan. */
 export interface ShotRequest {
@@ -88,7 +101,11 @@ export const createPlayer = (
   health: MAX_HEALTH,
   alive: true,
   weapon: 'rifle',
-  ammo: { rifle: getWeapon('rifle').magazine, pistol: getWeapon('pistol').magazine },
+  ammo: {
+    rifle: getWeapon('rifle').magazine,
+    pistol: getWeapon('pistol').magazine,
+    sniper: getWeapon('sniper').magazine,
+  },
   fireCooldown: 0,
   reloadRemaining: 0,
   shotIndex: 0,
@@ -96,6 +113,7 @@ export const createPlayer = (
   shotCounter: 0,
   attackHeld: false,
   switchHeld: false,
+  aiming: false,
 });
 
 /** Devuelve al jugador al estado inicial de ronda en el punto indicado. */
@@ -114,6 +132,7 @@ export const respawnPlayer = (player: PlayerState, pos: Vec3, yaw: number): void
   player.ammo = {
     rifle: getWeapon('rifle').magazine,
     pistol: getWeapon('pistol').magazine,
+    sniper: getWeapon('sniper').magazine,
   };
   player.fireCooldown = 0;
   player.reloadRemaining = 0;
@@ -121,6 +140,7 @@ export const respawnPlayer = (player: PlayerState, pos: Vec3, yaw: number): void
   player.timeSinceShot = 999;
   player.attackHeld = false;
   player.switchHeld = false;
+  player.aiming = false;
 };
 
 const emptyEvents = (): PlayerTickEvents => ({
@@ -186,7 +206,7 @@ export const simulatePlayerTick = (
   // --- Cambio de arma ---
   const switchPressed = hasButton(cmd.buttons, BUTTON.SWITCH);
   if (switchPressed && !player.switchHeld) {
-    player.weapon = player.weapon === 'rifle' ? 'pistol' : 'rifle';
+    player.weapon = nextWeapon(player.weapon);
     player.reloadRemaining = 0;
     player.shotIndex = 0;
     player.fireCooldown = Math.max(player.fireCooldown, 0.25);
@@ -195,6 +215,11 @@ export const simulatePlayerTick = (
   player.switchHeld = switchPressed;
 
   const weapon = getWeapon(player.weapon);
+
+  // --- Apuntado ---
+  // Se resuelve antes de mover y de disparar porque los dos dependen de el.
+  // Cambiar a un arma sin mira lo cancela solo, al no haber perfil de mira.
+  player.aiming = weapon.aim !== null && hasButton(cmd.buttons, BUTTON.AIM);
 
   // --- Recarga manual ---
   if (hasButton(cmd.buttons, BUTTON.RELOAD) && startReload(player)) {
@@ -208,13 +233,18 @@ export const simulatePlayerTick = (
 
   if (triggerPulled) {
     if (canFire(player)) {
-      const maxSpeed = maxSpeedFor(cmd.buttons, player.ducking, weapon.speedMultiplier);
+      const maxSpeed = maxSpeedFor(
+        cmd.buttons,
+        player.ducking,
+        weaponSpeedMultiplier(weapon, player.aiming),
+      );
       const spread = computeSpread(
         weapon,
         {
           speed: length2D(player.vel),
           onGround: player.onGround,
           ducking: player.ducking,
+          aiming: player.aiming,
         },
         maxSpeed,
       );
@@ -254,7 +284,7 @@ export const simulatePlayerTick = (
   player.attackHeld = attackPressed;
 
   // --- Movimiento ---
-  const moveEvents = moveStep(player, cmd, world, weapon.speedMultiplier);
+  const moveEvents = moveStep(player, cmd, world, weaponSpeedMultiplier(weapon, player.aiming));
   events.jumped = moveEvents.jumped;
   events.landed = moveEvents.landed;
   events.landingSpeed = moveEvents.landingSpeed;

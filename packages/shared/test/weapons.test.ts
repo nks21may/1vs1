@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  MAX_HEALTH,
-} from '../src/constants.js';
+import { MAX_HEALTH, MAX_SPEED } from '../src/constants.js';
 import {
   PISTOL,
   RIFLE,
+  SNIPER,
   computeDamage,
   computeShotAngles,
   computeSpread,
   getRecoil,
   shotSeed,
+  weaponSpeedMultiplier,
 } from '../src/weapons.js';
 
 describe('patron de retroceso', () => {
@@ -162,5 +162,70 @@ describe('computeDamage', () => {
     const pistolRatio =
       computeDamage(PISTOL, 'chest', 3000) / computeDamage(PISTOL, 'chest', 0);
     expect(pistolRatio).toBeLessThan(rifleRatio);
+  });
+});
+
+describe('rifle de precision', () => {
+  const quieto = { speed: 0, onGround: true, ducking: false };
+  const corriendo = { speed: MAX_SPEED, onGround: true, ducking: false };
+
+  it('mata de un tiro al cuerpo a un jugador a plena vida', () => {
+    expect(computeDamage(SNIPER, 'chest', 0)).toBeGreaterThanOrEqual(MAX_HEALTH);
+  });
+
+  it('a las piernas no mata de una vez: hay que acertar arriba', () => {
+    expect(computeDamage(SNIPER, 'legs', 0)).toBeLessThan(MAX_HEALTH);
+  });
+
+  it('aguanta el dano a distancia, que es para lo que esta', () => {
+    const cerca = computeDamage(SNIPER, 'chest', 0);
+    const lejos = computeDamage(SNIPER, 'chest', 4000);
+    expect(lejos).toBe(cerca);
+    // Incluso pasado el inicio de la caida sigue matando de un tiro.
+    expect(computeDamage(SNIPER, 'chest', 8000)).toBeGreaterThanOrEqual(MAX_HEALTH);
+  });
+
+  it('sin apuntar es inservible: dispersa mas que el rifle normal', () => {
+    const sniper = computeSpread(SNIPER, quieto, MAX_SPEED);
+    const rifle = computeSpread(RIFLE, quieto, MAX_SPEED);
+    expect(sniper).toBeGreaterThan(rifle * 5);
+  });
+
+  it('apuntando y quieto va donde se apunta', () => {
+    const apuntando = computeSpread(SNIPER, { ...quieto, aiming: true }, MAX_SPEED);
+    expect(apuntando).toBeLessThan(0.05);
+    // Y mejora en mas de un orden de magnitud respecto a la cadera.
+    expect(apuntando).toBeLessThan(computeSpread(SNIPER, quieto, MAX_SPEED) / 10);
+  });
+
+  it('apuntar no salva el disparo en carrera', () => {
+    const quietoApuntando = computeSpread(SNIPER, { ...quieto, aiming: true }, MAX_SPEED);
+    const corriendoApuntando = computeSpread(SNIPER, { ...corriendo, aiming: true }, MAX_SPEED);
+    expect(corriendoApuntando).toBeGreaterThan(quietoApuntando * 5);
+  });
+
+  it('apuntar no hace nada con un arma sin mira', () => {
+    expect(computeSpread(RIFLE, { ...quieto, aiming: true }, MAX_SPEED)).toBe(
+      computeSpread(RIFLE, quieto, MAX_SPEED),
+    );
+    expect(weaponSpeedMultiplier(PISTOL, true)).toBe(PISTOL.speedMultiplier);
+  });
+
+  it('apuntar cuesta movilidad', () => {
+    expect(weaponSpeedMultiplier(SNIPER, true)).toBeLessThan(
+      weaponSpeedMultiplier(SNIPER, false),
+    );
+    // Y llevarla ya pesa mas que llevar el rifle.
+    expect(SNIPER.speedMultiplier).toBeLessThan(RIFLE.speedMultiplier);
+  });
+
+  it('el primer tiro sale exacto, como en el resto de armas', () => {
+    expect(getRecoil(SNIPER, 0)).toEqual({ yaw: 0, pitch: 0 });
+    expect(getRecoil(SNIPER, 1).pitch).toBeGreaterThan(0);
+  });
+
+  it('es de un tiro por pulsacion y con ciclo lento', () => {
+    expect(SNIPER.mode).toBe('semi');
+    expect(SNIPER.cycleTime).toBeGreaterThan(RIFLE.cycleTime * 5);
   });
 });

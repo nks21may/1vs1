@@ -22,9 +22,8 @@ import {
   Object3D,
 } from 'three';
 
-import { type WeaponId, clamp, lerp } from '@neonduel/shared';
+import { type WeaponId, clamp, getWeapon, lerp } from '@neonduel/shared';
 
-import { PALETTE } from './scene.js';
 
 const part = (
   width: number,
@@ -96,9 +95,26 @@ const depthCleaner = (): Mesh => {
 const buildWeapon = (weapon: WeaponId): Group => {
   const group = new Group();
   const bodyColor = 0x0c1018;
-  const edge = weapon === 'rifle' ? PALETTE.tracer : PALETTE.teamB;
+  // El borde es el color del trazador del arma: asi la silueta que se ve en la
+  // mano y la linea que deja la bala son lo mismo, sin listas paralelas.
+  const edge = getWeapon(weapon).tracerColor;
 
-  if (weapon === 'rifle') {
+  if (weapon === 'sniper') {
+    const receiver = part(2.8, 3, 15, bodyColor, edge);
+    receiver.position.set(0, 0, -1);
+    // Canon largo: es lo que separa su silueta de la del rifle de un vistazo.
+    const barrel = part(1.1, 1.1, 22, bodyColor, edge);
+    barrel.position.set(0, 0.4, -18);
+    const scope = part(1.8, 1.8, 8, bodyColor, edge);
+    scope.position.set(0, 3, -5);
+    const scopeMount = part(0.8, 1.6, 1.2, bodyColor, edge);
+    scopeMount.position.set(0, 1.8, -5);
+    const bolt = part(2.6, 0.9, 1.2, bodyColor, edge);
+    bolt.position.set(1.6, 1, 2);
+    const stock = part(2.4, 3.2, 9, bodyColor, edge);
+    stock.position.set(0, -0.6, 9);
+    group.add(receiver, barrel, scope, scopeMount, bolt, stock);
+  } else if (weapon === 'rifle') {
     const receiver = part(3, 3.2, 13, bodyColor, edge);
     receiver.position.set(0, 0, -2);
     const barrel = part(1.3, 1.3, 12, bodyColor, edge);

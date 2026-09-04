@@ -30,6 +30,7 @@ const distanceBetween = (a: Vec3, b: Vec3): number =>
 export type SoundName =
   | 'rifle'
   | 'pistol'
+  | 'sniper'
   | 'impact'
   | 'hit'
   | 'headshot'
@@ -147,6 +148,15 @@ export class AudioEngine {
           tail: 1.6,
         });
         break;
+      case 'sniper':
+        // Mas grave y mas larga que el rifle: un disparo que se oye en todo el
+        // mapa y que delata al tirador durante un buen rato.
+        this.gunshot(gain, now, {
+          sub: 38, body: 68, crack: 1150, duration: 0.55, level: 0.5, punch: 0.62, weight: 1.15,
+          tail: 2.1,
+        });
+        break;
+
       case 'pistol':
         // Mas seca que el rifle: apenas sub, cuerpo mas alto y cola corta. No es
         // el mismo disparo mas agudo, es otro golpe.

@@ -52,6 +52,8 @@ export class InputManager {
   yaw = 0;
   pitch = 0;
   sensitivity = 2;
+  /** Escala de sensibilidad por el zoom; 1 sin apuntar. */
+  private zoomFactor = 1;
   invertY = false;
   /** True mientras el puntero este capturado por el lienzo. */
   locked = false;
@@ -107,8 +109,13 @@ export class InputManager {
    * para este tick.
    */
   consume(): InputState {
-    this.yaw = normalizeAngle(this.yaw - this.pendingYaw * YAW_PER_COUNT * this.sensitivity);
-    const pitchDelta = this.pendingPitch * YAW_PER_COUNT * this.sensitivity;
+    // Al apuntar, el mismo movimiento de raton tiene que recorrer los mismos
+    // pixeles de pantalla, no los mismos grados: sin escalar la sensibilidad
+    // con el zoom, la mira se vuelve inmanejable justo cuando mas precision
+    // hace falta.
+    const sens = this.sensitivity * this.zoomFactor;
+    this.yaw = normalizeAngle(this.yaw - this.pendingYaw * YAW_PER_COUNT * sens);
+    const pitchDelta = this.pendingPitch * YAW_PER_COUNT * sens;
     this.pitch = clamp(
       this.pitch + (this.invertY ? -pitchDelta : pitchDelta),
       -MAX_PITCH,
@@ -131,9 +138,18 @@ export class InputManager {
     if (this.isDown(this.bindings.walk)) buttons |= BUTTON.WALK;
     if (this.isDown(this.bindings.reload)) buttons |= BUTTON.RELOAD;
     if (this.isDown(this.bindings.switchWeapon)) buttons |= BUTTON.SWITCH;
-    // Boton izquierdo del raton: disparar.
+    // Boton izquierdo del raton: disparar. Derecho: apuntar.
     if (this.mouseButtons & 1) buttons |= BUTTON.ATTACK;
+    if (this.mouseButtons & (1 << 2)) buttons |= BUTTON.AIM;
     return buttons;
+  }
+
+  /**
+   * Escala la sensibilidad con el zoom. 1 es la vista normal; con la mira, la
+   * proporcion entre el FOV apuntado y el de siempre.
+   */
+  setZoomFactor(factor: number): void {
+    this.zoomFactor = clamp(factor, 0.05, 1);
   }
 
   /** Si el jugador tiene el marcador abierto. No viaja al servidor. */
