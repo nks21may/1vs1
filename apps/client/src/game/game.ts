@@ -19,6 +19,7 @@ import {
   type UserCommand,
   type Vec3,
   advanceFootstep,
+  accuracy,
   applyPhaseRestrictions,
   computeSpread,
   createFootstepTracker,
@@ -50,11 +51,12 @@ import { InputManager } from './input.js';
 import { NetClient, type ConnectionStatus, buildServerUrl } from './net.js';
 import { PredictionSystem } from './prediction.js';
 import type { Settings } from './settings.js';
+import type { StatsRow } from '../hud.js';
 
 export interface GameCallbacks {
   onStatus(status: ConnectionStatus, detail?: string): void;
   onLockChange(locked: boolean): void;
-  onMatchEnd(won: boolean): void;
+  onMatchEnd(won: boolean, rows: StatsRow[]): void;
 }
 
 export class Game {
@@ -381,7 +383,27 @@ export class Game {
         enemy?.name ?? 'RIVAL',
         enemy?.score ?? 0,
       );
+
+      // El marcador se rellena solo mientras esta abierto: son dos filas, pero
+      // no hay razon para tocar el DOM sesenta veces por segundo sin mirarlo.
+      const showing = this.input.showingStats;
+      this.hud.showStats(showing);
+      if (showing) this.hud.setStats(this.statsRows(snapshot));
     }
+  }
+
+  /** Las filas del marcador, con el jugador local siempre el primero. */
+  private statsRows(snapshot: SnapshotMessage): StatsRow[] {
+    return [...snapshot.players]
+      .sort((a, b) => Number(b.id === this.localId) - Number(a.id === this.localId))
+      .map((player) => ({
+        name: player.name,
+        score: player.score,
+        kills: player.stats.kills,
+        deaths: player.stats.deaths,
+        accuracy: accuracy(player.stats.hits, player.stats.shots),
+        self: player.id === this.localId,
+      }));
   }
 
   private onSnapshot(message: SnapshotMessage, receivedAt: number): void {
@@ -510,7 +532,7 @@ export class Game {
           const won = event.winnerId === this.localId;
           this.hud.announce(won ? 'VICTORIA' : 'DERROTA', won ? 'win' : 'lose', 6000);
           this.audio.play(won ? 'win' : 'lose');
-          this.callbacks.onMatchEnd(won);
+          this.callbacks.onMatchEnd(won, this.statsRows(message));
           break;
         }
 

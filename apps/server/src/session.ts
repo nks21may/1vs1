@@ -25,6 +25,7 @@ import {
   PROTOCOL_VERSION,
   type PlayerSnapshot,
   type PlayerState,
+  type PlayerStats,
   SNAPSHOT_FLAG,
   type ShotRequest,
   TICK_DT,
@@ -78,6 +79,8 @@ interface Participant {
   pendingViewYaw: number | null;
   /** Zancada acumulada, para saber cuando toca que suene una pisada. */
   footsteps: FootstepTracker;
+  /** Bajas, muertes y punteria de toda la partida. */
+  stats: PlayerStats;
 }
 
 export class MatchSession {
@@ -120,6 +123,11 @@ export class MatchSession {
     return this.participants.get(connectionId)?.player;
   }
 
+  /** Estadisticas de un jugador. Si no esta, un cero que no rompe nada. */
+  statsOf(playerId: number): PlayerStats {
+    return this.participants.get(playerId)?.stats ?? { kills: 0, deaths: 0, shots: 0, hits: 0 };
+  }
+
   /** Anade un jugador y le envia el mensaje de bienvenida. */
   join(connection: Connection): PlayerState {
     const slot = this.participants.size % 2;
@@ -138,6 +146,7 @@ export class MatchSession {
       spawnSlot: slot,
       pendingViewYaw: spawn.yaw,
       footsteps: createFootstepTracker(),
+      stats: { kills: 0, deaths: 0, shots: 0, hits: 0 },
     });
 
     connection.send({
@@ -305,6 +314,10 @@ export class MatchSession {
     const dir = shotDirection(shot.yaw, shot.pitch);
     const result = traceHitscan(this.world, targets, shot.origin, dir, weapon.range);
 
+    // Se cuenta aqui, antes de saber en que acaba: la punteria se mide sobre
+    // los disparos hechos, asi que fallar contra una pared tambien cuenta.
+    participant.stats.shots += 1;
+
     this.pendingEvents.push({
       t: 'shot',
       id: participant.player.id,
@@ -335,6 +348,8 @@ export class MatchSession {
     const victim = this.participants.get(result.playerId)?.player;
     if (!victim || !victim.alive) return;
 
+    participant.stats.hits += 1;
+
     const damage = computeDamage(weapon, result.hitGroup, result.distance);
     const killed = applyDamage(victim, damage);
 
@@ -359,6 +374,9 @@ export class MatchSession {
   ): void {
     victim.alive = false;
     victim.health = 0;
+    this.statsOf(victim.id).deaths += 1;
+    // Matarse solo (el vacio) no suma una baja a nadie.
+    if (killerId !== null && killerId !== victim.id) this.statsOf(killerId).kills += 1;
     this.pendingEvents.push({ t: 'death', victim: victim.id, killer: killerId, group });
     this.handleMatchEvents(this.match.reportDeath(victim.id));
   }
@@ -380,6 +398,16 @@ export class MatchSession {
           break;
         case 'matchEnd':
           this.pendingEvents.push({ t: 'matchEnd', winnerId: event.winnerId });
+          break;
+        case 'phase':
+          // Entrar en calentamiento es empezar partida nueva: las estadisticas
+          // son de la partida, no de la sesion, y arrastrarlas falsearia la
+          // punteria de la siguiente.
+          if (event.phase === 'warmup') {
+            for (const participant of this.participants.values()) {
+              participant.stats = { kills: 0, deaths: 0, shots: 0, hits: 0 };
+            }
+          }
           break;
         default:
           break;
@@ -445,6 +473,7 @@ export class MatchSession {
           ? round2(1 - player.reloadRemaining / weapon.reloadTime)
           : 0,
       score: this.match.scoreOf(player.id),
+      stats: { ...this.statsOf(player.id) },
     };
   }
 

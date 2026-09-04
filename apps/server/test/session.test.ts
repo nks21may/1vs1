@@ -17,6 +17,7 @@ import {
   SNAPSHOT_FLAG,
   TICK_DT,
   type UserCommand,
+  accuracy,
   createCollisionWorld,
   createMoveState,
   moveStep,
@@ -558,5 +559,131 @@ describe('pasos audibles', () => {
     const { session, a } = newSession();
     goLive(session);
     expect(stepTicks(session, a, 0, 200)).toEqual([]);
+  });
+});
+
+describe('estadisticas de la partida', () => {
+  /** Deja a los dos enfrentados en el carril sur, que esta despejado. */
+  const faceOff = (session: MatchSession) => {
+    const shooter = session.playerOf(1)!;
+    const target = session.playerOf(2)!;
+    shooter.pos = vec3(-700, -300, 0);
+    shooter.vel = vec3();
+    shooter.onGround = true;
+    target.pos = vec3(-300, -300, 0);
+    target.vel = vec3();
+    target.onGround = true;
+    return { shooter, target };
+  };
+
+  /**
+   * Devuelve una funcion de disparar que lleva su propia cuenta de secuencia:
+   * el servidor descarta los comandos ya vistos, asi que empezar cada tanda
+   * desde el numero uno haria que no llegase ninguno.
+   */
+  const tirador = (session: MatchSession) => {
+    let seq = 0;
+    return (veces: number, yaw: number) => {
+      for (let i = 0; i < veces; i++) {
+        seq += 1;
+        session.handleMessage(1, input([cmd(seq, BUTTON.ATTACK, yaw, 0)]));
+        // Varios ticks por disparo: el rifle tiene tiempo de ciclo.
+        for (let t = 0; t < 8; t++) session.update();
+      }
+    };
+  };
+
+  it('la punteria se mide sobre los disparos hechos, no sobre los que aciertan', () => {
+    const { session } = newSession();
+    goLive(session);
+    faceOff(session);
+
+    // Mirando al lado contrario del rival: los cinco disparos se pierden.
+    tirador(session)(5, 180);
+
+    const stats = session.statsOf(1);
+    expect(stats.shots).toBe(5);
+    expect(stats.hits).toBe(0);
+    expect(accuracy(stats.hits, stats.shots)).toBe(0);
+  });
+
+  it('acertar cuenta como disparo y como acierto', () => {
+    const { session } = newSession();
+    goLive(session);
+    faceOff(session);
+
+    tirador(session)(1, 0);
+
+    const stats = session.statsOf(1);
+    expect(stats.shots).toBe(1);
+    expect(stats.hits).toBe(1);
+    expect(accuracy(stats.hits, stats.shots)).toBe(1);
+  });
+
+  it('sin disparar, la punteria es cero y no una division por cero', () => {
+    const { session } = newSession();
+    goLive(session);
+    const stats = session.statsOf(1);
+    expect(stats.shots).toBe(0);
+    expect(accuracy(stats.hits, stats.shots)).toBe(0);
+  });
+
+  it('las estadisticas viajan en la instantanea', () => {
+    const { session, a } = newSession();
+    goLive(session);
+    faceOff(session);
+
+    tirador(session)(2, 180);
+
+    const me = a.last('snapshot')!.players.find((p) => p.id === 1)!;
+    expect(me.stats).toMatchObject({ shots: 2, hits: 0 });
+  });
+
+  it('matar suma una baja al asesino y una muerte a la victima', () => {
+    const { session } = newSession();
+    goLive(session);
+    const { target } = faceOff(session);
+
+    // A la altura de los ojos y sin dispersion: el disparo va a la cabeza, y
+    // con el multiplicador de la cabeza mata de una vez.
+    tirador(session)(1, 0);
+
+    expect(target.alive).toBe(false);
+    expect(session.statsOf(1).kills).toBe(1);
+    expect(session.statsOf(2).deaths).toBe(1);
+  });
+
+  it('caerse al vacio no le suma una baja a nadie', () => {
+    const { session } = newSession();
+    goLive(session);
+    const victim = session.playerOf(2)!;
+    victim.pos = vec3(0, 0, -100000);
+
+    ticks(session, 2);
+
+    expect(victim.alive).toBe(false);
+    expect(session.statsOf(2).deaths).toBe(1);
+    expect(session.statsOf(1).kills).toBe(0);
+  });
+
+  it('empezar partida nueva pone las estadisticas a cero', () => {
+    const { session } = newSession();
+    const dispara = tirador(session);
+
+    // Ganar las dos rondas que dura la partida de prueba. Por tiempo no vale:
+    // una ronda agotada no da punto a nadie y la partida no acabaria nunca.
+    for (let ronda = 0; ronda < 2; ronda++) {
+      goLive(session);
+      faceOff(session);
+      dispara(1, 0);
+    }
+    expect(session.match.phase).toBe('matchEnd');
+    expect(session.statsOf(1).shots).toBe(2);
+
+    let guard = 0;
+    while (session.match.phase !== 'warmup' && guard++ < 5000) session.update();
+
+    expect(session.match.phase).toBe('warmup');
+    expect(session.statsOf(1)).toMatchObject({ shots: 0, hits: 0, kills: 0, deaths: 0 });
   });
 });

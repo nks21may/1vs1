@@ -17,6 +17,45 @@ const byId = <T extends HTMLElement>(id: string): T => {
   return element as T;
 };
 
+/** Una linea del marcador, ya formateada por quien sabe de la partida. */
+export interface StatsRow {
+  name: string;
+  score: number;
+  kills: number;
+  deaths: number;
+  /** Punteria en [0, 1]. */
+  accuracy: number;
+  /** Si es el jugador local, para poder distinguirlo de un vistazo. */
+  self: boolean;
+}
+
+/**
+ * Pinta las filas del marcador. Se rehace entero en cada apertura: son dos
+ * filas, y reconciliar el DOM por tan poco solo daria formas de equivocarse.
+ */
+export const renderStatsRows = (tbody: HTMLElement, rows: StatsRow[]): void => {
+  tbody.replaceChildren(
+    ...rows.map((row) => {
+      const tr = document.createElement('tr');
+      tr.className = row.self ? 'stats-row--self' : 'stats-row--enemy';
+      const celdas = [
+        row.name,
+        String(row.score),
+        String(row.kills),
+        String(row.deaths),
+        `${Math.round(row.accuracy * 100)}%`,
+      ];
+      celdas.forEach((texto, i) => {
+        const td = document.createElement('td');
+        if (i === 0) td.className = 'stats-name';
+        td.textContent = texto;
+        tr.append(td);
+      });
+      return tr;
+    }),
+  );
+};
+
 const PHASE_LABELS: Record<MatchPhase, string> = {
   waiting: 'ESPERANDO RIVAL',
   warmup: 'CALENTAMIENTO',
@@ -56,6 +95,8 @@ export class Hud {
   private readonly netgraph = byId('netgraph');
   private readonly netPing = byId('net-ping');
   private readonly netFps = byId('net-fps');
+  private readonly statsPanel = byId('stats-panel');
+  private readonly statsRows = byId('stats-rows');
 
   private hitmarkerTimer: ReturnType<typeof setTimeout> | null = null;
   private announcementTimer: ReturnType<typeof setTimeout> | null = null;
@@ -104,6 +145,15 @@ export class Hud {
     // La barra llega al maximo con el tope de carrera; correr mas (bunnyhop)
     // la desborda a proposito, para que se note que se ha ganado velocidad.
     this.speedFill.style.transform = `scaleX(${clamp(speed / maxSpeed, 0, 1.4)})`;
+  }
+
+  /** Muestra u oculta el marcador completo (Tab). */
+  showStats(visible: boolean): void {
+    this.statsPanel.hidden = !visible;
+  }
+
+  setStats(rows: StatsRow[]): void {
+    renderStatsRows(this.statsRows, rows);
   }
 
   setScore(selfName: string, selfScore: number, enemyName: string, enemyScore: number): void {

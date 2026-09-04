@@ -66,6 +66,22 @@
         </div>
       </footer>
 
+      <section class="stats" id="stats-panel" hidden aria-label="Marcador">
+        <table class="stats-table">
+          <thead>
+            <tr>
+              <th class="stats-name">JUGADOR</th>
+              <th>RONDAS</th>
+              <th>BAJAS</th>
+              <th>MUERTES</th>
+              <th>PUNTERIA</th>
+            </tr>
+          </thead>
+          <tbody id="stats-rows"></tbody>
+        </table>
+        <p class="stats-hint">MANTEN TAB</p>
+      </section>
+
       <div class="netgraph" id="netgraph">
         <span id="net-ping">-- ms</span>
         <span id="net-fps">-- fps</span>
@@ -170,6 +186,28 @@
         <p class="panel-text">El ratón está libre. La partida sigue en el servidor.</p>
         <button class="button button--primary" type="button" id="resume">Volver al duelo</button>
         <button class="button" type="button" id="leave">Salir al menú</button>
+      </div>
+    </div>
+
+    <!-- Resumen de la partida -->
+    <div class="overlay" id="summary" hidden>
+      <div class="panel">
+        <h2 class="panel-title" id="summary-title">FIN DE PARTIDA</h2>
+        <table class="stats-table stats-table--summary">
+          <thead>
+            <tr>
+              <th class="stats-name">JUGADOR</th>
+              <th>RONDAS</th>
+              <th>BAJAS</th>
+              <th>MUERTES</th>
+              <th>PUNTERIA</th>
+            </tr>
+          </thead>
+          <tbody id="summary-rows"></tbody>
+        </table>
+        <button class="button button--primary" type="button" id="summary-close">
+          Volver al menu
+        </button>
       </div>
     </div>
 

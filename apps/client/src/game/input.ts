@@ -17,6 +17,8 @@ export interface InputBindings {
   walk: string[];
   reload: string[];
   switchWeapon: string[];
+  /** Abrir el marcador. Es solo del cliente: no viaja al servidor. */
+  stats: string[];
 }
 
 export const DEFAULT_BINDINGS: InputBindings = {
@@ -29,6 +31,7 @@ export const DEFAULT_BINDINGS: InputBindings = {
   walk: ['ShiftLeft'],
   reload: ['KeyR'],
   switchWeapon: ['KeyQ', 'Digit2'],
+  stats: ['Tab'],
 };
 
 /** Conversion de sensibilidad al estilo de Source: grados por unidad de raton. */
@@ -133,14 +136,22 @@ export class InputManager {
     return buttons;
   }
 
+  /** Si el jugador tiene el marcador abierto. No viaja al servidor. */
+  get showingStats(): boolean {
+    return this.isDown(this.bindings.stats);
+  }
+
   private isDown(codes: string[]): boolean {
     return codes.some((code) => this.pressed.has(code));
   }
 
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
     this.pressed.add(event.code);
-    // El espacio hace scroll y F5 recarga: solo se bloquea con el juego activo.
-    if (this.locked && event.code === 'Space') event.preventDefault();
+    // El espacio hace scroll y el tabulador cambia el foco: solo se bloquean
+    // con el juego activo, para no romper la navegacion por teclado del menu.
+    if (this.locked && (event.code === 'Space' || event.code === 'Tab')) {
+      event.preventDefault();
+    }
   };
 
   private readonly handleKeyUp = (event: KeyboardEvent): void => {

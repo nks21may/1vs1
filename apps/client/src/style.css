@@ -733,3 +733,70 @@ kbd {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Marcador con Tab y resumen de fin de partida */
+.stats {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: min(560px, 88vw);
+  padding: 18px 22px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  backdrop-filter: blur(6px);
+}
+
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+}
+
+.stats-table th {
+  padding: 0 10px 8px;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 11px;
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+}
+
+.stats-table td {
+  padding: 9px 10px;
+  text-align: right;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-table .stats-name {
+  text-align: left;
+}
+
+.stats-table tr + tr td {
+  border-top: 1px solid rgba(120, 180, 220, 0.08);
+}
+
+/* El propio jugador se distingue de un vistazo, sin tener que leer el nombre. */
+.stats-table .stats-row--self .stats-name {
+  color: var(--cyan);
+}
+
+.stats-table .stats-row--enemy .stats-name {
+  color: var(--magenta);
+}
+
+.stats-hint {
+  margin: 10px 0 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+}
+
+.stats-table--summary {
+  margin: 18px 0 22px;
+}

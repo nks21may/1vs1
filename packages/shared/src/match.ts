@@ -190,3 +190,13 @@ export class MatchState {
     return [{ type: 'phase', phase }];
   }
 }
+
+/**
+ * Punteria: proporcion de disparos que han tocado a alguien, en [0, 1].
+ *
+ * El denominador son los disparos **realizados**, no los que han impactado en
+ * algo: fallar contra una pared cuenta, que es justo lo que hace que el numero
+ * signifique algo. Sin disparos la punteria es 0 y no una division por cero.
+ */
+export const accuracy = (hits: number, shots: number): number =>
+  shots > 0 ? hits / shots : 0;

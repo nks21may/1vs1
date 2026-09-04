@@ -8,6 +8,7 @@
 import './style.css';
 
 import { Game } from './game/game.js';
+import { renderStatsRows, type StatsRow } from './hud.js';
 import type { ConnectionStatus } from './game/net.js';
 import { loadSettings, saveSettings, type Settings } from './game/settings.js';
 
@@ -28,6 +29,10 @@ const playBot = byId<HTMLButtonElement>('play-bot');
 const difficulty = byId<HTMLFieldSetElement>('difficulty');
 const resumeButton = byId<HTMLButtonElement>('resume');
 const leaveButton = byId<HTMLButtonElement>('leave');
+const summary = byId<HTMLElement>('summary');
+const summaryTitle = byId<HTMLElement>('summary-title');
+const summaryRows = byId<HTMLElement>('summary-rows');
+const summaryClose = byId<HTMLButtonElement>('summary-close');
 
 const controls = {
   sensitivity: byId<HTMLInputElement>('sensitivity'),
@@ -105,7 +110,18 @@ const setStatusMessage = (text: string, isError = false): void => {
 const showMenu = (): void => {
   menu.hidden = false;
   pause.hidden = true;
+  summary.hidden = true;
   document.body.classList.remove('playing');
+};
+
+const showSummary = (won: boolean, rows: StatsRow[]): void => {
+  summaryTitle.textContent = won ? 'VICTORIA' : 'DERROTA';
+  renderStatsRows(summaryRows, rows);
+  summary.hidden = false;
+  pause.hidden = true;
+  document.body.classList.remove('playing');
+  // Soltar el raton para poder pulsar el boton; el juego ya ha terminado.
+  if (document.pointerLockElement) document.exitPointerLock();
 };
 
 const showPause = (): void => {
@@ -116,6 +132,7 @@ const showPause = (): void => {
 const hideOverlays = (): void => {
   menu.hidden = true;
   pause.hidden = true;
+  summary.hidden = true;
   document.body.classList.add('playing');
 };
 
@@ -145,17 +162,18 @@ const startMatch = (bot: string | null): void => {
       },
       onLockChange: (locked) => {
         if (!inMatch) return;
+        // Con el resumen en pantalla la partida ya ha acabado: soltar el raton
+        // no es una pausa, y sacar el panel de pausa encima taparia los numeros.
+        if (!summary.hidden) return;
         if (locked) hideOverlays();
         else showPause();
       },
-      onMatchEnd: () => {
-        // Se deja ver el marcador final antes de volver al menu.
+      onMatchEnd: (won, rows) => {
+        // Se deja ver el ultimo momento de la partida y luego el resumen. No se
+        // vuelve solo al menu: quien acaba de jugar querra leer los numeros.
         setTimeout(() => {
-          if (inMatch) {
-            endMatch();
-            setStatusMessage('Partida terminada.');
-          }
-        }, 6000);
+          if (inMatch) showSummary(won, rows);
+        }, 3500);
       },
     });
   }
@@ -186,6 +204,11 @@ playBot.addEventListener('click', () => {
 
 resumeButton.addEventListener('click', () => {
   game?.requestPointerLock();
+});
+
+summaryClose.addEventListener('click', () => {
+  endMatch();
+  setStatusMessage('Partida terminada.');
 });
 
 leaveButton.addEventListener('click', () => {

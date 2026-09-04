@@ -78,6 +78,18 @@ export interface PlayerSnapshot {
   /** Progreso de recarga en [0, 1]; 0 si no esta recargando. */
   reload: number;
   score: number;
+  /** Bajas, muertes y punteria acumuladas en la partida. */
+  stats: PlayerStats;
+}
+
+/** Lo que se acumula a lo largo de la partida, no de la ronda. */
+export interface PlayerStats {
+  kills: number;
+  deaths: number;
+  /** Disparos realizados, acierten o no: es el denominador de la punteria. */
+  shots: number;
+  /** Disparos que han tocado a un rival. */
+  hits: number;
 }
 
 export const SNAPSHOT_FLAG = {

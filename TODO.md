@@ -207,13 +207,32 @@ así se pudra.
     la mira y a los 0,7 s ya está centrado. En la ronda siguiente la vista vuelve
     a ser la del jugador. Sin errores de consola.
 
-- [ ] **T04. Marcador y resumen de partida**
+- [x] **T04. Marcador y resumen de partida**
   No hay forma de ver el estado más allá de los dos números de arriba. Falta un
   panel con `Tab` (rondas ganadas, bajas, precisión) y una pantalla de fin de
   partida antes de volver al menú.
   - Requiere llevar la cuenta de disparos y aciertos por jugador en el servidor.
   - Hecho cuando: el servidor envía las estadísticas en la instantánea, `Tab` las
     muestra, y hay test de que la precisión se calcula sobre disparos realizados.
+  - **Hecho (2026-09-03).** El servidor lleva `kills`, `deaths`, `shots` y `hits`
+    por jugador y los manda en cada `PlayerSnapshot`. `Tab` abre el marcador
+    mientras se mantiene, y al acabar la partida sale un resumen con el mismo
+    cuadro y un botón para volver al menú.
+  - **El disparo se cuenta antes de saber en qué acaba**, que es lo que hace que
+    la punteria signifique algo: fallar contra una pared entra en el denominador.
+    Hay test de las dos caras (cinco disparos al aire = 0%, uno acertado = 100%)
+    y del caso sin disparos, que da 0 y no una división por cero.
+  - Las estadísticas son **de la partida, no de la sesión**: entrar en
+    calentamiento las pone a cero, o la punteria de la siguiente partida saldría
+    falseada. Con test.
+  - Caerse al vacío suma muerte pero no baja a nadie.
+  - Verificado en partida real contra el bot difícil: el marcador aparece y
+    desaparece con `Tab`, y el resumen final dio bot 8 rondas / 8 bajas / **25% de
+    punteria** y jugador 0 disparos / **0%** — justo las dos propiedades que
+    importaban, medidas sobre datos reales y sin errores de consola.
+  - Ojo para más adelante: las estadísticas viajan en cada instantánea aunque
+    casi nunca cambien. Con dos jugadores y JSON da igual; si alguna vez se hace
+    el delta de T13, esto es candidato claro a no repetirse.
 
 ---
 
