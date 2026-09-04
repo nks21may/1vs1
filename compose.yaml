@@ -1,0 +1,29 @@
+# El juego es un solo contenedor. Por defecto escucha unicamente en el loopback
+# de la maquina, que es lo que necesita un tunel de Cloudflare o un proxy local:
+# nada de esto tiene que asomar a internet por su cuenta.
+#
+#   docker compose up -d --build
+#
+# Para exponerlo directamente, sin nada delante, basta con cambiar el puerto:
+#
+#   PUBLISH=0.0.0.0:80 docker compose up -d --build
+
+services:
+  neonduel:
+    build: .
+    image: neonduel:latest
+    restart: unless-stopped
+    ports:
+      - '${PUBLISH:-127.0.0.1:8090}:8080'
+    # El servidor es un unico proceso con un bucle a 64 Hz: no gana nada con mas
+    # nucleos, pero conviene que no se los quede si algo se desboca.
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'

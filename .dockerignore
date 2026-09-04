@@ -1,0 +1,19 @@
+# Todo lo que se genera dentro de la imagen o no hace falta para compilarla.
+node_modules
+**/node_modules
+dist
+**/dist
+dist-types
+**/dist-types
+coverage
+**/*.tsbuildinfo
+.git
+.github
+.claude
+.vite
+**/.vite
+.env
+*.md
+Dockerfile
+.dockerignore
+compose.yaml

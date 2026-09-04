@@ -208,11 +208,11 @@ Variables de entorno del servidor: `PORT` (8080) y `HOST` (0.0.0.0).
 
 ## Tests
 
-266 tests, ~97% de cobertura sobre la simulación y el servidor.
+335 tests, ~97% de cobertura sobre la simulación y el servidor.
 
 ```
 packages/shared/test/   Física, colisión, armas, hitscan, reglas, protocolo, mapa
-apps/server/test/       Sesión autoritativa, emparejamiento, bot, y e2e por WebSocket
+apps/server/test/       Sesión autoritativa, emparejamiento, bot, e2e por WebSocket y empaquetado
 apps/client/test/       Predicción, interpolación, entrada y ajustes
 ```
 
@@ -226,6 +226,11 @@ donde el cliente veía al rival y no donde está ahora.
 El test de extremo a extremo levanta el servidor real en un puerto efímero y habla
 con él por WebSocket como lo haría el navegador: emparejamiento, movimiento
 confirmado, paquetes malformados y desconexiones.
+
+El de empaquetado no ejecuta Docker: lee el `Dockerfile` y comprueba que las rutas
+a las que copia el servidor y el cliente son las mismas que el servidor busca al
+arrancar. Si dejan de coincidir, la imagen se construye sin quejarse y responde
+404 a todo.
 
 La simulación no consulta ningún reloj -- avanza por pasos explícitos -- así que
 una partida completa se ejecuta en milisegundos y sin esperas ni tests inestables.
@@ -242,6 +247,19 @@ PORT=8080 npm start
 El mismo proceso sirve los archivos estáticos del cliente y el WebSocket, así que
 basta con exponer un puerto. Detrás de un proxy inverso hay que permitir la
 actualización a WebSocket; con TLS, el cliente usa `wss://` automáticamente.
+
+Con Docker no hace falta ni tener Node instalado:
+
+```bash
+docker compose up -d --build   # el juego en 127.0.0.1:8090
+```
+
+El contenedor escucha solo en el loopback, para dejarlo detrás de lo que ya haya
+en la máquina --un túnel de Cloudflare, un nginx--; con `PUBLISH=0.0.0.0:80` se
+expone directamente. La imagen se construye en dos etapas y la final se queda con
+el bundle del servidor, el cliente compilado y `ws`, así que vale igual en x86_64
+que en ARM64. Los pasos completos para la VPS gratuita de Oracle Cloud están en
+[DEPLOY.md](DEPLOY.md).
 
 Cada partida es una sesión independiente en memoria; el emparejamiento junta a los
 jugadores de dos en dos y libera la sesión cuando se vacía. Para escalar a varias

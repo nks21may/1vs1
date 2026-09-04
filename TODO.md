@@ -370,11 +370,15 @@ así se pudra.
   - Hecho cuando: se pueden reasignar teclas y ajustar color, grosor y modo
     (estática o dinámica) de la mira, todo persistido con el resto de ajustes.
 
-- [ ] **T15. Docker y observabilidad**
-  Para desplegarlo en algún sitio hacen falta una imagen y métricas mínimas
-  (partidas activas, tick real, jugadores conectados) en el endpoint de salud.
-  - Hecho cuando: `docker build` produce una imagen que arranca el juego, y
-    `/health` informa del tick real medido, no del teórico.
+- [ ] **T15. Docker y observabilidad** — la imagen ya está (2026-09-04); falta la
+  observabilidad.
+  `Dockerfile`, `compose.yaml` y [DEPLOY.md](DEPLOY.md) construyen la imagen en
+  x86_64 y en ARM64 y la dejan lista para servir detrás de un túnel o un proxy.
+  Lo que sigue pendiente son las métricas: `/health` solo informa de las sesiones
+  vivas y de la versión del protocolo, y el tick que anuncia el `welcome` es el
+  teórico, no el que el bucle consigue de verdad.
+  - Hecho cuando: `/health` informa del tick real medido, de los jugadores
+    conectados y de las partidas activas.
 
 - [ ] **T16. Rendimiento del render**
   Cada brush es una malla ([world.ts](apps/client/src/render/world.ts)). Con ~70
@@ -404,3 +408,7 @@ cambiarlas, que sea a propósito y no por descuido:
 - **La simulación no consulta el reloj.** Todo avanza por pasos explícitos. Es lo
   que permite simular una partida entera en milisegundos en los tests; cualquier
   `Date.now()` dentro de la simulación rompe esa propiedad.
+- **La imagen de Docker no lleva `node_modules`.** El servidor se publica como el
+  bundle de esbuild más `ws`, que es lo único que queda fuera. Copiar el árbol
+  entero traería `three` y el resto de dependencias del cliente, que en tiempo de
+  ejecución no pinta nada.
