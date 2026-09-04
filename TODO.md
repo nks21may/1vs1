@@ -10,7 +10,8 @@ pena, dónde tocar y cuándo se considera terminada.
 
 Una iteración = **una tarea completa**, no media. El ciclo es siempre el mismo:
 
-1. Coger la primera tarea sin marcar de la prioridad más alta que quede.
+1. Coger la primera tarea sin marcar de la prioridad más alta que quede,
+   **saltando las marcadas `⏸ EN PAUSA`** (ver abajo).
 2. Implementarla entera, con sus tests.
 3. `npm run check` (typecheck + toda la batería) en verde.
 4. Si toca al cliente, comprobarlo en el navegador de verdad, no solo por tests.
@@ -19,11 +20,17 @@ Una iteración = **una tarea completa**, no media. El ciclo es siempre el mismo:
 Los identificadores (`T01`, `T02`...) son etiquetas estables para poder
 referenciarlas, no un orden de ejecución: el orden es el de la lista.
 
+**`⏸ EN PAUSA` no es lo mismo que "sin hacer".** Una tarea en pausa lo está
+porque alguien decidió que no se haga, no porque nadie haya llegado a ella:
+saltarla es lo correcto y no hay que anotar nada al respecto. Solo se quita la
+pausa si lo pide quien la puso.
+
 Para automatizarlo:
 
 ```
-/loop Coge la primera tarea sin marcar de TODO.md, impleméntala entera con sus
-tests, deja `npm run check` en verde y marca la casilla. Una sola tarea por
+/loop Coge la primera tarea sin marcar de TODO.md que no esté EN PAUSA,
+impleméntala entera con sus tests, deja `npm run check` en verde y marca la
+casilla. Una sola tarea por
 iteración; si te bloqueas, anótalo en la tarea y para.
 ```
 
@@ -270,7 +277,9 @@ así se pudra.
   - Verificado en partida real: el servidor confirma `weapon: sniper`, apuntar
     lleva el FOV de 74° a 28° y cierra la mira, y no hay errores de consola.
 
-- [ ] **T06. Economía por rondas**
+- [ ] **T06. Economía por rondas** — ⏸ **EN PAUSA (2026-09-03, decisión de Nicolás).**
+  No la cojas en ninguna iteración automática: está aparcada a propósito, no
+  pendiente. Si un loop llega hasta aquí, saltar a la siguiente sin marcarla.
   Ganar o perder una ronda no tiene consecuencia en la siguiente. Un dinero simple
   (recompensa por ronda y por baja, compra en la fase de congelación) crea
   decisiones entre rondas.
