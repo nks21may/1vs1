@@ -1,12 +1,17 @@
 /**
- * Definicion del mapa "ATRIUM".
+ * Mapas del juego.
  *
  * La geometria se construye por codigo a partir de cajas alineadas a los ejes:
  * el mismo dato alimenta la colision del servidor y la malla del cliente, asi
  * que es imposible que lo que se ve y lo que se choca se desincronicen.
  *
- * Solo se disena la mitad oeste (x < 0) y se refleja: la simetria exacta es un
- * requisito de un 1v1 competitivo, y reflejar la garantiza por construccion.
+ * De cada mapa solo se disena la mitad oeste (x < 0) y se refleja: la simetria
+ * exacta es un requisito de un 1v1 competitivo, y reflejar la garantiza por
+ * construccion en lugar de por revision.
+ *
+ * Hay dos, y son opuestos a proposito: ATRIUM es una arena abierta con juego
+ * vertical, y CONDUIT son pasillos y esquinas cerradas. Lo que se juega bien en
+ * uno no se juega igual en el otro, que es la gracia de tener mas de uno.
  */
 
 import type { Brush, CollisionWorld } from './collision.js';
@@ -56,10 +61,10 @@ export const mirrorBrushX = (brush: Brush): Brush => ({
   max: vec3(-brush.min.x, brush.max.y, brush.max.z),
 });
 
-const HALF_X = 1152;
-const HALF_Y = 896;
-const WALL_HEIGHT = 640;
-const WALL_THICKNESS = 64;
+const ATRIUM_HALF_X = 1152;
+const ATRIUM_HALF_Y = 896;
+const ATRIUM_WALL_HEIGHT = 640;
+const ATRIUM_WALL_THICKNESS = 64;
 
 /** Altura de peldano: nunca debe superar `STEP_SIZE` o habria que saltar. */
 export const STAIR_RISE = 16;
@@ -116,27 +121,27 @@ const BALCONY_Z = 128;
 const buildBrushes = (): Brush[] => {
   // --- Piezas centrales, simetricas por si mismas ---
   const central: Brush[] = [
-    box(-HALF_X, -HALF_Y, -64, HALF_X, HALF_Y, 0, 'floor'),
+    box(-ATRIUM_HALF_X, -ATRIUM_HALF_Y, -64, ATRIUM_HALF_X, ATRIUM_HALF_Y, 0, 'floor'),
 
     // Muros perimetrales.
-    box(-HALF_X - WALL_THICKNESS, -HALF_Y, 0, -HALF_X, HALF_Y, WALL_HEIGHT, 'wall'),
-    box(HALF_X, -HALF_Y, 0, HALF_X + WALL_THICKNESS, HALF_Y, WALL_HEIGHT, 'wall'),
+    box(-ATRIUM_HALF_X - ATRIUM_WALL_THICKNESS, -ATRIUM_HALF_Y, 0, -ATRIUM_HALF_X, ATRIUM_HALF_Y, ATRIUM_WALL_HEIGHT, 'wall'),
+    box(ATRIUM_HALF_X, -ATRIUM_HALF_Y, 0, ATRIUM_HALF_X + ATRIUM_WALL_THICKNESS, ATRIUM_HALF_Y, ATRIUM_WALL_HEIGHT, 'wall'),
     box(
-      -HALF_X - WALL_THICKNESS,
-      -HALF_Y - WALL_THICKNESS,
+      -ATRIUM_HALF_X - ATRIUM_WALL_THICKNESS,
+      -ATRIUM_HALF_Y - ATRIUM_WALL_THICKNESS,
       0,
-      HALF_X + WALL_THICKNESS,
-      -HALF_Y,
-      WALL_HEIGHT,
+      ATRIUM_HALF_X + ATRIUM_WALL_THICKNESS,
+      -ATRIUM_HALF_Y,
+      ATRIUM_WALL_HEIGHT,
       'wall',
     ),
     box(
-      -HALF_X - WALL_THICKNESS,
-      HALF_Y,
+      -ATRIUM_HALF_X - ATRIUM_WALL_THICKNESS,
+      ATRIUM_HALF_Y,
       0,
-      HALF_X + WALL_THICKNESS,
-      HALF_Y + WALL_THICKNESS,
-      WALL_HEIGHT,
+      ATRIUM_HALF_X + ATRIUM_WALL_THICKNESS,
+      ATRIUM_HALF_Y + ATRIUM_WALL_THICKNESS,
+      ATRIUM_WALL_HEIGHT,
       'wall',
     ),
 
@@ -145,8 +150,8 @@ const buildBrushes = (): Brush[] => {
     box(-112, -256, 0, 112, 256, 448, 'accent'),
 
     // Balcones norte y sur: el juego alto del mapa.
-    box(-960, 448, 0, 960, HALF_Y, BALCONY_Z, 'platform'),
-    box(-960, -HALF_Y, 0, 960, -448, BALCONY_Z, 'platform'),
+    box(-960, 448, 0, 960, ATRIUM_HALF_Y, BALCONY_Z, 'platform'),
+    box(-960, -ATRIUM_HALF_Y, 0, 960, -448, BALCONY_Z, 'platform'),
     // La barandilla deja libres los extremos, que es por donde suben las escaleras.
     box(-700, 416, BALCONY_Z, 700, 448, BALCONY_Z + 48, 'cover'),
     box(-700, -448, BALCONY_Z, 700, -416, BALCONY_Z + 48, 'cover'),
@@ -155,7 +160,7 @@ const buildBrushes = (): Brush[] => {
   // --- Mitad oeste (se refleja al este) ---
   const west: Brush[] = [
     // Torre de spawn y su rampa escalonada hacia el centro.
-    box(-HALF_X, -160, 0, -960, 160, SPAWN_TOWER_Z, 'platform'),
+    box(-ATRIUM_HALF_X, -160, 0, -960, 160, SPAWN_TOWER_Z, 'platform'),
     ...stairs({
       axis: 'x',
       start: -960,
@@ -210,11 +215,100 @@ export const ATRIUM: GameMap = {
     { pos: vec3(1056, 0, SPAWN_TOWER_Z + 8), yaw: 180 },
   ],
   bounds: {
-    min: vec3(-HALF_X - WALL_THICKNESS, -HALF_Y - WALL_THICKNESS, -256),
-    max: vec3(HALF_X + WALL_THICKNESS, HALF_Y + WALL_THICKNESS, WALL_HEIGHT),
+    min: vec3(-ATRIUM_HALF_X - ATRIUM_WALL_THICKNESS, -ATRIUM_HALF_Y - ATRIUM_WALL_THICKNESS, -256),
+    max: vec3(ATRIUM_HALF_X + ATRIUM_WALL_THICKNESS, ATRIUM_HALF_Y + ATRIUM_WALL_THICKNESS, ATRIUM_WALL_HEIGHT),
   },
   killZ: -256,
 };
+
+
+// --- CONDUIT -----------------------------------------------------------------
+
+const CONDUIT_HALF_X = 1152;
+const CONDUIT_HALF_Y = 768;
+const CONDUIT_WALL_HEIGHT = 512;
+const CONDUIT_WALL_THICKNESS = 64;
+
+/**
+ * CONDUIT: tres carriles paralelos separados por muros macizos.
+ *
+ * Al contrario que ATRIUM, aqui casi no hay angulos largos ni juego vertical:
+ * se avanza por pasillos y se pelea en las esquinas y en los huecos que
+ * comunican los carriles. El bloque central tapa la linea entre los dos spawns,
+ * asi que la ronda empieza eligiendo carril, y cambiar de idea a mitad de ronda
+ * cuesta cruzar por un hueco que el rival puede estar mirando.
+ */
+const buildConduitBrushes = (): Brush[] => {
+  const h = CONDUIT_WALL_HEIGHT;
+  const t = CONDUIT_WALL_THICKNESS;
+
+  const central: Brush[] = [
+    box(-CONDUIT_HALF_X, -CONDUIT_HALF_Y, -64, CONDUIT_HALF_X, CONDUIT_HALF_Y, 0, 'floor'),
+
+    // Muros perimetrales.
+    box(-CONDUIT_HALF_X - t, -CONDUIT_HALF_Y, 0, -CONDUIT_HALF_X, CONDUIT_HALF_Y, h, 'wall'),
+    box(CONDUIT_HALF_X, -CONDUIT_HALF_Y, 0, CONDUIT_HALF_X + t, CONDUIT_HALF_Y, h, 'wall'),
+    box(-CONDUIT_HALF_X - t, -CONDUIT_HALF_Y - t, 0, CONDUIT_HALF_X + t, -CONDUIT_HALF_Y, h, 'wall'),
+    box(-CONDUIT_HALF_X - t, CONDUIT_HALF_Y, 0, CONDUIT_HALF_X + t, CONDUIT_HALF_Y + t, h, 'wall'),
+
+    // Bloque central: sin el, los dos spawns se verian de frente.
+    box(-288, -288, 0, 288, 288, h, 'accent'),
+
+    // Tramo central de los muros que separan los carriles. Los huecos quedan
+    // entre este tramo y los de los extremos, ya en la mitad de cada jugador.
+    box(-544, 384, 0, 544, 448, h, 'wall'),
+    box(-544, -448, 0, 544, -384, h, 'wall'),
+  ];
+
+  const west: Brush[] = [
+    // Tramos exteriores de los muros de carril: dejan un hueco de 224 unidades
+    // por el que se cambia de carril, uno a cada lado del mapa.
+    box(-CONDUIT_HALF_X, 384, 0, -768, 448, h, 'wall'),
+    box(-CONDUIT_HALF_X, -448, 0, -768, -384, h, 'wall'),
+
+    // Esquina ciega junto al hueco: quien cruza no ve el pasillo entero de
+    // golpe, y quien espera no puede cubrir el hueco y el pasillo a la vez.
+    box(-672, 448, 0, -608, 608, h, 'wall'),
+    box(-672, -608, 0, -608, -448, h, 'wall'),
+
+    // Pilares que parten los pasillos laterales por la mitad.
+    box(-352, 560, 0, -256, 656, h, 'accent'),
+    box(-352, -656, 0, -256, -560, h, 'accent'),
+
+    // Cobertura baja del carril central, para poder cruzarlo agachado.
+    box(-640, -96, 0, -512, 96, 96, 'cover'),
+    box(-928, 176, 0, -832, 304, 64, 'cover'),
+    box(-928, -304, 0, -832, -176, 64, 'cover'),
+  ];
+
+  return [...central, ...west, ...west.map(mirrorBrushX)];
+};
+
+export const CONDUIT: GameMap = {
+  name: 'CONDUIT',
+  brushes: buildConduitBrushes(),
+  spawns: [
+    { pos: vec3(-1056, 0, 8), yaw: 0 },
+    { pos: vec3(1056, 0, 8), yaw: 180 },
+  ],
+  bounds: {
+    min: vec3(-CONDUIT_HALF_X - CONDUIT_WALL_THICKNESS, -CONDUIT_HALF_Y - CONDUIT_WALL_THICKNESS, -256),
+    max: vec3(CONDUIT_HALF_X + CONDUIT_WALL_THICKNESS, CONDUIT_HALF_Y + CONDUIT_WALL_THICKNESS, CONDUIT_WALL_HEIGHT),
+  },
+  killZ: -256,
+};
+
+/** Todos los mapas jugables, por nombre. */
+export const MAPS: Readonly<Record<string, GameMap>> = {
+  ATRIUM,
+  CONDUIT,
+};
+
+export const DEFAULT_MAP = ATRIUM;
+
+/** Busca un mapa por nombre, sin distinguir mayusculas. `undefined` si no existe. */
+export const getMap = (name: string | null | undefined): GameMap | undefined =>
+  name ? MAPS[name.toUpperCase()] : undefined;
 
 /** Comprobacion de invariantes usada por los tests del mapa. */
 export const MAX_STAIR_RISE = STAIR_RISE;

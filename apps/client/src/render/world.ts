@@ -201,3 +201,18 @@ export const buildWorldMesh = (map: GameMap): Group => {
 
   return group;
 };
+
+/**
+ * Libera la malla de un mapa. Cambiar de mapa entre partidas sin esto va
+ * dejando geometrias y materiales en la GPU que ya no dibuja nadie.
+ */
+export const disposeWorldMesh = (group: Group): void => {
+  group.traverse((object) => {
+    const conGeometria = object as { geometry?: { dispose(): void }; material?: unknown };
+    conGeometria.geometry?.dispose();
+    const material = conGeometria.material;
+    for (const m of Array.isArray(material) ? material : [material]) {
+      (m as { dispose?: () => void } | undefined)?.dispose?.();
+    }
+  });
+};

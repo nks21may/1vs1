@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 import { WebSocketServer, type WebSocket } from 'ws';
 
-import { PROTOCOL_VERSION, parseClientMessage, sanitizeName } from '@neonduel/shared';
+import { PROTOCOL_VERSION, getMap, parseClientMessage, sanitizeName } from '@neonduel/shared';
 
 import type { Connection } from './connection.js';
 import { type BotSkill, GameServer, TICK_INTERVAL } from './game-server.js';
@@ -140,6 +140,9 @@ export const startServer = async (options: StartOptions = {}): Promise<ServerHan
     const id = game.allocateConnectionId();
     const url = new URL(request.url ?? '/', 'http://localhost');
     const botSkill = url.searchParams.get('bot');
+    // Mapa pedido por el cliente. Si el nombre no existe, se ignora y se juega
+    // en el de siempre: un parametro raro no debe tumbar la conexion.
+    const requestedMap = getMap(url.searchParams.get('map'));
     const connection = new SocketConnection(id, socket, `PLAYER_${id}`);
 
     let joined = false;
@@ -171,9 +174,9 @@ export const startServer = async (options: StartOptions = {}): Promise<ServerHan
         joined = true;
 
         if (botSkill && BOT_SKILLS.has(botSkill)) {
-          game.joinBotMatch(connection, botSkill as BotSkill);
+          game.joinBotMatch(connection, botSkill as BotSkill, requestedMap);
         } else {
-          game.joinMatch(connection);
+          game.joinMatch(connection, requestedMap);
         }
         return;
       }

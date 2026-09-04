@@ -286,12 +286,35 @@ así se pudra.
   - Hecho cuando: la fase `freeze` permite comprar, el dinero se simula en el
     servidor y hay tests de las reglas de recompensa.
 
-- [ ] **T07. Segundo mapa**
+- [x] **T07. Segundo mapa**
   `ATRIUM` es una arena abierta. Un mapa con pasillos y ángulos cerrados prueba
   que el motor no está atado a un solo diseño, y de paso obligará a mejorar al bot.
   - La definición ya lo admite sin tocar el motor: ver [map.ts](packages/shared/src/map.ts).
   - Hecho cuando: el mapa pasa los mismos tests que `ATRIUM` (simetría, spawns no
     sólidos, rutas transitables) y se puede elegir al crear la partida.
+  - **Hecho (2026-09-03).** `CONDUIT`: tres carriles paralelos separados por muros
+    macizos, sin altura y sin ángulos largos. Un bloque central tapa la línea entre
+    spawns, los huecos que comunican los carriles quedan en la mitad de cada uno
+    con una esquina ciega al lado, y un pilar parte cada pasillo (si no, serían dos
+    rectas de 2300 unidades y el LONGWAVE no tendría rival).
+  - Los invariantes de mapa **pasaron a ser table-driven sobre `MAPS`**: simetría,
+    volumen positivo, límites, spawns fuera de la geometría, suelo firme, sin
+    línea de tiro entre spawns y muros que encierran. Un mapa nuevo que incumpla
+    algo rompe la batería el día que se añade, no el día que alguien se cae.
+  - "Rutas transitables" se comprueba con una **búsqueda en anchura** sobre las
+    posiciones donde el jugador cabe, no con un camino escrito a mano: un camino a
+    mano solo prueba ese camino.
+  - **Bug encontrado por el camino:** el cliente tenía `ATRIUM` fijo tanto para la
+    malla como para la geometría contra la que predice. Elegir otro mapa habría
+    hecho que el jugador viera un mapa y chocara con otro. Ahora el mapa lo fija el
+    `welcome` del servidor y el cliente rehace las dos cosas (liberando la malla
+    anterior, o cambiar de mapa entre partidas iba dejando geometrías en la GPU).
+  - Se elige en el menú; viaja como `?map=` y el servidor ignora un nombre que no
+    conozca en lugar de tumbar la conexión. El bot navega el mapa que se juega, que
+    antes era siempre el de por defecto.
+  - Verificado en partida real con los dos: el `welcome` devuelve el mapa pedido,
+    ambos se recorren andando (380 y 400 unidades en 2,5 s) y no hay errores de
+    consola.
 
 - [ ] **T08. Avatares animados**
   Los rivales se deslizan rígidos. Con inclinación al correr y balanceo de piernas

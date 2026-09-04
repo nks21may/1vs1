@@ -27,6 +27,7 @@ const nameInput = byId<HTMLInputElement>('name-input');
 const playOnline = byId<HTMLButtonElement>('play-online');
 const playBot = byId<HTMLButtonElement>('play-bot');
 const difficulty = byId<HTMLFieldSetElement>('difficulty');
+const mapChoice = byId<HTMLFieldSetElement>('map-choice');
 const resumeButton = byId<HTMLButtonElement>('resume');
 const leaveButton = byId<HTMLButtonElement>('leave');
 const summary = byId<HTMLElement>('summary');
@@ -144,6 +145,10 @@ const STATUS_TEXT: Record<ConnectionStatus, string> = {
   error: 'No se pudo conectar. ¿Está el servidor en marcha?',
 };
 
+/** Mapa marcado en el menu. */
+const selectedMap = (): string | null =>
+  mapChoice.querySelector<HTMLInputElement>('input[name="map"]:checked')?.value ?? null;
+
 const startMatch = (bot: string | null): void => {
   updateSettings({ name: nameInput.value.trim() || 'JUGADOR' });
 
@@ -181,7 +186,7 @@ const startMatch = (bot: string | null): void => {
   game.applySettings(settings);
   inMatch = true;
   hideOverlays();
-  game.start(bot);
+  game.start(bot, selectedMap());
   game.requestPointerLock();
 };
 

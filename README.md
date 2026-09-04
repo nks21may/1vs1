@@ -23,7 +23,7 @@ un duelo real, **Buscar rival** en dos pestañas o dos equipos.
 - [Arquitectura](#arquitectura)
 - [El netcode](#el-netcode)
 - [El movimiento](#el-movimiento)
-- [El mapa](#el-mapa)
+- [Los mapas](#los-mapas)
 - [Comandos](#comandos)
 - [Tests](#tests)
 - [Despliegue](#despliegue)
@@ -68,7 +68,7 @@ packages/shared/     Simulación determinista (la usan cliente y servidor)
   math.ts            Vectores, ángulos y RNG reproducible
   collision.ts       Trazado de AABB barridos (estilo Quake)
   movement.ts        Física de movimiento tipo Source
-  map.ts             Geometría del mapa, generada por código
+  map.ts             Geometría de los mapas, generada por código
   weapons.ts         Armas, retroceso y dispersión
   hitscan.ts         Balas contra geometría y hitboxes
   player.ts          Estado del jugador y paso de simulación
@@ -160,18 +160,33 @@ bhop encadenado da control pero no velocidad infinita.
 
 ---
 
-## El mapa
+## Los mapas
 
-`ATRIUM` es una arena simétrica generada por código. Solo se diseña la mitad oeste
-y se refleja, lo que garantiza que los dos lados son idénticos: en un 1v1 eso no es
-un detalle estético, es una condición de justicia. Un test lo comprueba brush a
-brush.
+Hay dos, y se eligen en el menú antes de empezar. Los dos se generan por código:
+solo se diseña la mitad oeste y se refleja, lo que garantiza que los dos lados son
+idénticos. En un 1v1 eso no es un detalle estético, es una condición de justicia,
+y un test lo comprueba brush a brush **en todos los mapas**.
 
-Un monolito central corta la línea de tiro entre spawns, dos balcones dan juego
-alto, y las escaleras tienen peldaños de 16 unidades (por debajo del escalón máximo
-de 18) para poder subirlas caminando. Hay tests que recorren esas rutas de verdad
-con la física real, para que no se cuele una escalera imposible o un pasillo
-bloqueado.
+**ATRIUM** es una arena abierta con juego vertical. Un monolito central corta la
+línea de tiro entre spawns, dos balcones dan altura, y las escaleras tienen
+peldaños de 16 unidades (por debajo del escalón máximo de 18) para poder subirlas
+caminando.
+
+**CONDUIT** es lo contrario: tres carriles paralelos separados por muros macizos,
+sin apenas ángulos largos ni altura. Se avanza por pasillos y se pelea en las
+esquinas y en los huecos que comunican los carriles. Cambiar de carril a mitad de
+ronda cuesta cruzar por un hueco que el rival puede estar mirando.
+
+Los invariantes (simetría, spawns fuera de la geometría, suelo firme al aparecer,
+sin línea de tiro entre spawns, muros que encierran la arena) se comprueban sobre
+todos los mapas a la vez, así que un mapa nuevo que los incumpla rompe la batería
+el día que se añade. Además, en CONDUIT una búsqueda en anchura sobre posiciones
+donde el jugador cabe comprueba que de verdad se puede ir andando de un spawn al
+otro: un camino escrito a mano solo probaría ese camino.
+
+El mapa lo decide el servidor y lo anuncia en el `welcome`; el cliente construye
+con él tanto la malla como la geometría contra la que predice, para que no pueda
+darse el caso de ver un mapa y chocar con otro.
 
 ---
 
@@ -238,8 +253,9 @@ instancias haría falta un emparejador externo, que hoy no existe.
 
 - **Sin cuentas ni persistencia**: los resultados no se guardan.
 - **Emparejamiento simple**: por orden de llegada, sin nivel ni regiones.
-- **Un solo mapa**, aunque la definición admite añadir más sin tocar el motor.
+- **Dos mapas**; la definición admite añadir más sin tocar el motor.
 - **El protocolo es JSON**: cómodo de depurar y suficiente para dos jugadores
   (~15 KB/s), pero un formato binario sería más eficiente con más jugadores.
 - **El bot no usa navegación por mallas**: persigue en línea recta y rodea cuando
-  detecta que no progresa. Le basta para esta arena, no para un mapa con pasillos.
+  detecta que no progresa. Le basta para ATRIUM; en CONDUIT, que es todo pasillos,
+  se le nota (ver T09 en `TODO.md`).

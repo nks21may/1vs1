@@ -8,7 +8,6 @@
  */
 
 import {
-  ATRIUM,
   type ClientMessage,
   type GameMap,
   type MatchConfig,
@@ -55,10 +54,15 @@ export class GameServer {
     return this.nextConnectionId++;
   }
 
-  /** Mete a un jugador en la primera partida con hueco, o crea una nueva. */
-  joinMatch(connection: Connection): MatchSession {
+  /**
+   * Mete a un jugador en la primera partida con hueco, o crea una nueva.
+   *
+   * El mapa pedido solo cuenta si acaba creando partida: entrar en una que ya
+   * esta en marcha es entrar en el mapa que se este jugando.
+   */
+  joinMatch(connection: Connection, map?: GameMap): MatchSession {
     const open = this.sessions.find((entry) => !entry.private && !entry.session.isFull);
-    const entry = open ?? this.createSession(false);
+    const entry = open ?? this.createSession(false, map);
 
     entry.session.join(connection);
     this.sessionByConnection.set(connection.id, entry);
@@ -66,8 +70,8 @@ export class GameServer {
   }
 
   /** Crea una partida privada contra un bot del nivel indicado. */
-  joinBotMatch(connection: Connection, skill: BotSkill = 'normal'): MatchSession {
-    const entry = this.createSession(true);
+  joinBotMatch(connection: Connection, skill: BotSkill = 'normal', map?: GameMap): MatchSession {
+    const entry = this.createSession(true, map);
     entry.session.join(connection);
     this.sessionByConnection.set(connection.id, entry);
 
@@ -80,7 +84,8 @@ export class GameServer {
     entry.bots.push({
       controller: new BotController(
         botConnection.id,
-        createCollisionWorld(this.options.map ?? ATRIUM),
+        // El bot navega el mismo mapa que se esta jugando, no el de por defecto.
+        createCollisionWorld(entry.session.map),
         BOT_DIFFICULTIES[skill],
         this.options.botSeed ?? (Date.now() & 0xffff),
       ),
@@ -135,10 +140,10 @@ export class GameServer {
     }
   }
 
-  private createSession(isPrivate: boolean): SessionEntry {
+  private createSession(isPrivate: boolean, map?: GameMap): SessionEntry {
     const entry: SessionEntry = {
       session: new MatchSession({
-        map: this.options.map,
+        map: map ?? this.options.map,
         matchConfig: this.options.matchConfig,
       }),
       bots: [],

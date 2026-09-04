@@ -141,7 +141,7 @@ export class NetClient {
 }
 
 /** URL del WebSocket a partir de la pagina actual y las opciones de partida. */
-export const buildServerUrl = (bot: string | null): string => {
+export const buildServerUrl = (bot: string | null, map?: string | null): string => {
   const params = new URLSearchParams(window.location.search);
   const explicit = params.get('server');
   const base =
@@ -150,5 +150,9 @@ export const buildServerUrl = (bot: string | null): string => {
       // En desarrollo el cliente lo sirve Vite en otro puerto que el juego.
       window.location.port === '5173' ? `${window.location.hostname}:8080` : window.location.host
     }`;
-  return bot ? `${base}/?bot=${encodeURIComponent(bot)}` : base;
+  const query = new URLSearchParams();
+  if (bot) query.set('bot', bot);
+  if (map) query.set('map', map);
+  const cadena = query.toString();
+  return cadena ? `${base}/?${cadena}` : base;
 };

@@ -9,8 +9,9 @@
 import { Group, Vector3 } from 'three';
 
 import {
-  ATRIUM,
-  ATRIUM_WORLD,
+  type CollisionWorld,
+  DEFAULT_MAP,
+  type GameMap,
   INTERP_DELAY_MS,
   type MatchPhase,
   type PlayerSnapshot,
@@ -20,6 +21,7 @@ import {
   type Vec3,
   type WeaponDef,
   advanceFootstep,
+  createCollisionWorld,
   accuracy,
   applyPhaseRestrictions,
   computeSpread,
@@ -27,6 +29,7 @@ import {
   createPlayer,
   eyePosition,
   getRecoil,
+  getMap,
   getWeapon,
   length2D,
   maxSpeedFor,
@@ -42,7 +45,7 @@ import { EffectSystem } from '../render/effects.js';
 import { AvatarManager } from '../render/players.js';
 import { PALETTE, applyViewAngles, createRenderContext, toThree } from '../render/scene.js';
 import { ViewModel } from '../render/viewmodel.js';
-import { buildWorldMesh } from '../render/world.js';
+import { buildWorldMesh, disposeWorldMesh } from '../render/world.js';
 import { InterpolationBuffer, type InterpolatedPlayer } from './interpolation.js';
 import {
   type DeathCamera,
@@ -71,7 +74,14 @@ export class Game {
   private readonly viewModel = new ViewModel();
   private readonly avatars: AvatarManager;
   private readonly interpolation = new InterpolationBuffer(INTERP_DELAY_MS);
-  private readonly world = ATRIUM_WORLD;
+  /**
+   * Mapa en juego. Lo fija el `welcome` del servidor: el cliente no lo elige,
+   * lo pide. Si prediccion y servidor no simularan la misma geometria, el
+   * jugador atravesaria paredes en su pantalla y volveria de golpe.
+   */
+  private map: GameMap = DEFAULT_MAP;
+  private world: CollisionWorld = createCollisionWorld(DEFAULT_MAP);
+  private worldMesh: Group | null = null;
   private readonly entityGroup = new Group();
 
   private prediction: PredictionSystem | null = null;
@@ -111,7 +121,7 @@ export class Game {
     this.input = new InputManager(canvas);
     this.avatars = new AvatarManager(this.entityGroup);
 
-    this.render.scene.add(buildWorldMesh(ATRIUM));
+    this.setMap(DEFAULT_MAP);
     this.render.scene.add(this.entityGroup);
     this.render.scene.add(this.effects.group);
     this.render.camera.add(this.viewModel.root);
@@ -120,6 +130,11 @@ export class Game {
     this.net = new NetClient({
       onWelcome: (message) => {
         this.localId = message.playerId;
+        // El mapa lo manda el servidor, no lo decide el cliente: si el nombre
+        // no se reconoce se sigue con el de por defecto, que es lo que el
+        // servidor tambien hace con un parametro que no entiende.
+        const mapa = getMap(message.mapName);
+        if (mapa && mapa !== this.map) this.setMap(mapa);
       },
       onSnapshot: (message, receivedAt) => this.onSnapshot(message, receivedAt),
       onStatus: (status, detail) => this.callbacks.onStatus(status, detail),
@@ -143,14 +158,14 @@ export class Game {
   }
 
   /** Conecta y arranca el bucle. `bot` selecciona partida de practica. */
-  start(bot: string | null): void {
+  start(bot: string | null, map?: string | null): void {
     this.audio.init();
     this.input.attach();
     this.hud.setVisible(true);
     this.hud.clearKillfeed();
     this.resize();
 
-    this.net.connect(buildServerUrl(bot), this.settings.name);
+    this.net.connect(buildServerUrl(bot, map), this.settings.name);
 
     this.running = true;
     this.lastFrame = performance.now();
@@ -456,6 +471,18 @@ export class Game {
       this.punchYaw = 0;
       this.punchPitch = 0;
     }
+  }
+
+  /** Cambia el mapa: rehace la malla y la geometria contra la que se predice. */
+  private setMap(map: GameMap): void {
+    this.map = map;
+    this.world = createCollisionWorld(map);
+    if (this.worldMesh) {
+      this.render.scene.remove(this.worldMesh);
+      disposeWorldMesh(this.worldMesh);
+    }
+    this.worldMesh = buildWorldMesh(map);
+    this.render.scene.add(this.worldMesh);
   }
 
   private initialisePrediction(self: PlayerSnapshot): void {
