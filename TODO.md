@@ -11,7 +11,7 @@ pena, dónde tocar y cuándo se considera terminada.
 Una iteración = **una tarea completa**, no media. El ciclo es siempre el mismo:
 
 1. Coger la primera tarea sin marcar de la prioridad más alta que quede,
-   **saltando las marcadas `⏸ EN PAUSA`** (ver abajo).
+   **saltando las marcadas `⏸ EN PAUSA` o `❓ POR DEFINIR`** (ver abajo).
 2. Implementarla entera, con sus tests.
 3. `npm run check` (typecheck + toda la batería) en verde.
 4. Si toca al cliente, comprobarlo en el navegador de verdad, no solo por tests.
@@ -19,6 +19,10 @@ Una iteración = **una tarea completa**, no media. El ciclo es siempre el mismo:
 
 Los identificadores (`T01`, `T02`...) son etiquetas estables para poder
 referenciarlas, no un orden de ejecución: el orden es el de la lista.
+
+**`❓ POR DEFINIR` tampoco se coge.** Es una tarea pedida pero sin alcance: falta
+decidir qué es. Implementarla a ojo es inventarse el encargo, así que se salta
+igual que una en pausa hasta que alguien escriba su criterio de "hecho".
 
 **`⏸ EN PAUSA` no es lo mismo que "sin hacer".** Una tarea en pausa lo está
 porque alguien decidió que no se haga, no porque nadie haya llegado a ella:
@@ -83,6 +87,27 @@ así se pudra.
   - **Queda medir el coste en una GPU real.** La comprobación corre sobre SwiftShader
     (render por software), que no sirve para juzgar rendimiento, así que si el MSAA
     debe exponerse como ajuste junto a «Brillo (bloom)» sigue sin poder decidirse.
+
+- [ ] **T19. Strafe** — ❓ **POR DEFINIR (pedida el 2026-09-04 por Nicolás).**
+  No la cojas en una iteración automática hasta que tenga alcance: implementarla
+  a ojo es lo mismo que inventarse el encargo.
+  **Lo que ya existe** (y por eso hace falta concretar): el air-strafing con
+  aceleración de Quake, el counter-strafe que frena en seco por debajo de
+  `STOP_SPEED`, y el bunnyhop con ventana de 150 ms y techo relativo al arma.
+  Están en [movement.ts](packages/shared/src/movement.ts), documentados en el
+  README y con tests que comprueban altura de salto, frenada y cadena de saltos.
+  - Lecturas posibles de "añadir strafe", por si alguna es la buena:
+    - **Aprenderlo**: hoy no hay forma de saber si strafeas bien. El HUD tiene
+      velocidad, pero no dice cuánta ganas por salto ni si el girón llega tarde.
+      Un indicador de calidad del strafe (ganancia por salto, ángulo óptimo) o un
+      modo de práctica sería contenido nuevo de verdad.
+    - **Surf**: deslizarse por rampas inclinadas. Hoy imposible sin tocar el
+      motor: la colisión es solo de cajas alineadas a los ejes, y admitir planos
+      inclinados es un cambio grande en `collision.ts`.
+    - **Que el avatar se incline al strafear**, que en realidad es parte de T08.
+    - **Otra cosa**: si el strafe se siente mal jugando, decir en qué se nota
+      (no gana velocidad, gira raro, se pierde al aterrizar) y eso ya es la tarea.
+  - Hecho cuando: esté escrito aquí qué de lo anterior es, con su criterio propio.
 
 - [ ] **T18. Disparos más graves y con más cuerpo**
   Suenan finos y secos. El rifle usa un cuerpo de 150 Hz con un chasquido de
