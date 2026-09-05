@@ -7,12 +7,7 @@
  * puede ejecutar en un test tan rapido como la CPU lo permita.
  */
 
-import {
-  type ClientMessage,
-  type GameMap,
-  type MatchConfig,
-  TICK_DT,
-} from '@neonduel/shared';
+import { type ClientMessage, type GameMap, type MatchConfig, TICK_DT } from '@neonduel/shared';
 
 import { BOT_DIFFICULTIES, BotController } from './bot.js';
 import { type Connection, MemoryConnection } from './connection.js';
@@ -86,7 +81,7 @@ export class GameServer {
         // El bot navega el mismo mapa que se esta jugando, no el de por defecto.
         entry.session.map,
         BOT_DIFFICULTIES[skill],
-        this.options.botSeed ?? (Date.now() & 0xffff),
+        this.options.botSeed ?? Date.now() & 0xffff,
       ),
       connectionId: botConnection.id,
     });
@@ -106,9 +101,7 @@ export class GameServer {
     entry.session.leave(connectionId);
     this.sessionByConnection.delete(connectionId);
 
-    const humansLeft = [...this.sessionByConnection.values()].filter(
-      (e) => e === entry,
-    ).length;
+    const humansLeft = [...this.sessionByConnection.values()].filter((e) => e === entry).length;
 
     if (humansLeft === 0) {
       for (const bot of entry.bots) entry.session.leave(bot.connectionId);
@@ -127,9 +120,7 @@ export class GameServer {
       for (const bot of entry.bots) {
         const self = entry.session.playerOf(bot.connectionId);
         if (!self) continue;
-        const enemy = entry.session
-          .players()
-          .find((p) => p.id !== bot.connectionId);
+        const enemy = entry.session.players().find((p) => p.id !== bot.connectionId);
         entry.session.pushCommand(
           bot.connectionId,
           bot.controller.think(self, enemy, !entry.session.match.isLive),

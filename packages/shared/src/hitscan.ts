@@ -6,11 +6,7 @@
  * rebobinadas (ver `lagcomp.ts`) para que el cliente acierte donde apunto.
  */
 
-import {
-  HEAD_HITBOX_BOTTOM,
-  HITBOX_HALF_WIDTH,
-  LEGS_HITBOX_TOP,
-} from './constants.js';
+import { HEAD_HITBOX_BOTTOM, HITBOX_HALF_WIDTH, LEGS_HITBOX_TOP } from './constants.js';
 import { type Brush, type CollisionWorld, traceRay } from './collision.js';
 import { type Vec3, angleVectors, distance as dist, vec3 } from './math.js';
 import { playerHeight } from './movement.js';
@@ -75,8 +71,7 @@ export interface HitscanResult {
 }
 
 /** Direccion unitaria de disparo a partir de los angulos de vista. */
-export const shotDirection = (yaw: number, pitch: number): Vec3 =>
-  angleVectors(yaw, pitch).forward;
+export const shotDirection = (yaw: number, pitch: number): Vec3 => angleVectors(yaw, pitch).forward;
 
 /**
  * Lanza una bala desde `origin` en direccion `dir` (unitaria).
@@ -90,11 +85,7 @@ export const traceHitscan = (
   dir: Vec3,
   range: number,
 ): HitscanResult => {
-  const end = vec3(
-    origin.x + dir.x * range,
-    origin.y + dir.y * range,
-    origin.z + dir.z * range,
-  );
+  const end = vec3(origin.x + dir.x * range, origin.y + dir.y * range, origin.z + dir.z * range);
 
   const worldTrace = traceRay(world, origin, end);
   let bestFraction = worldTrace.hit ? worldTrace.fraction : 1;
@@ -107,11 +98,7 @@ export const traceHitscan = (
   if (hitboxes.length > 0) {
     const hitboxWorld: CollisionWorld = { brushes: hitboxes, bounds: world.bounds };
     const playerTrace = traceRay(hitboxWorld, origin, end);
-    if (
-      playerTrace.hit &&
-      !playerTrace.startSolid &&
-      playerTrace.fraction <= bestFraction
-    ) {
+    if (playerTrace.hit && !playerTrace.startSolid && playerTrace.fraction <= bestFraction) {
       const box = hitboxes[playerTrace.brushIndex];
       if (box) {
         bestFraction = playerTrace.fraction;
@@ -138,8 +125,5 @@ export const traceHitscan = (
 };
 
 /** True si hay linea de vision directa entre dos puntos (usado por el bot). */
-export const hasLineOfSight = (
-  world: CollisionWorld,
-  from: Vec3,
-  to: Vec3,
-): boolean => !traceRay(world, from, to).hit;
+export const hasLineOfSight = (world: CollisionWorld, from: Vec3, to: Vec3): boolean =>
+  !traceRay(world, from, to).hit;

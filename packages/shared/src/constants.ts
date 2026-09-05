@@ -146,5 +146,4 @@ export const HELD_BUTTONS = BUTTON.DUCK | BUTTON.WALK | BUTTON.AIM;
 
 export type ButtonMask = number;
 
-export const hasButton = (buttons: ButtonMask, button: number): boolean =>
-  (buttons & button) !== 0;
+export const hasButton = (buttons: ButtonMask, button: number): boolean => (buttons & button) !== 0;

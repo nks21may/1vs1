@@ -170,12 +170,7 @@ export const accelerate = (
 };
 
 /** Aceleracion en el aire: el `wishSpeed` efectivo se limita a 30 u/s. */
-export const airAccelerate = (
-  vel: Vec3,
-  wishDir: Vec3,
-  wishSpeed: number,
-  dt: number,
-): void => {
+export const airAccelerate = (vel: Vec3, wishDir: Vec3, wishSpeed: number, dt: number): void => {
   const cappedWish = Math.min(wishSpeed, AIR_MAX_WISH_SPEED);
   const currentSpeed = vel.x * wishDir.x + vel.y * wishDir.y + vel.z * wishDir.z;
   const addSpeed = cappedWish - currentSpeed;
@@ -237,11 +232,7 @@ const tryPlayerMove = (state: MoveState, world: CollisionWorld, dt: number): num
       const b = planes[planes.length - 1]!;
       const dotAB = a.x * b.x + a.y * b.y + a.z * b.z;
       if (dotAB < 0.99) {
-        const edge = vec3(
-          a.y * b.z - a.z * b.y,
-          a.z * b.x - a.x * b.z,
-          a.x * b.y - a.y * b.x,
-        );
+        const edge = vec3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
         normalizeInPlace(edge);
         const d = clipped.x * edge.x + clipped.y * edge.y + clipped.z * edge.z;
         clipped = scale(edge, d);
@@ -325,10 +316,7 @@ const stepMove = (state: MoveState, world: CollisionWorld, dt: number): void => 
 };
 
 /** Convierte los botones de movimiento en una direccion deseada normalizada. */
-export const wishDirection = (
-  buttons: number,
-  yaw: number,
-): { dir: Vec3; magnitude: number } => {
+export const wishDirection = (buttons: number, yaw: number): { dir: Vec3; magnitude: number } => {
   const { forward, right } = angleVectors(yaw, 0);
   let f = 0;
   let s = 0;
@@ -449,9 +437,7 @@ export const moveStep = (
       const chained = state.timeSinceLanding <= BHOP_WINDOW;
       // El `max` no es defensivo por gusto: apuntando con la mira la carrera se
       // desploma, y sin el, encadenar recortaria mas que no encadenar.
-      const cap = chained
-        ? Math.max(JUMP_SPEED_CAP, runSpeed * BHOP_SPEED_RATIO)
-        : JUMP_SPEED_CAP;
+      const cap = chained ? Math.max(JUMP_SPEED_CAP, runSpeed * BHOP_SPEED_RATIO) : JUMP_SPEED_CAP;
       if (speed > cap) {
         const f = cap / speed;
         state.vel.x *= f;

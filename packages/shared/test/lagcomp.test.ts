@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { MAX_REWIND_MS } from '../src/constants.js';
-import {
-  LagCompensationBuffer,
-  computeRewindTime,
-  toHitboxTargets,
-} from '../src/lagcomp.js';
+import { LagCompensationBuffer, computeRewindTime, toHitboxTargets } from '../src/lagcomp.js';
 
 const frame = (tick: number, timeMs: number, x: number) => ({
   tick,

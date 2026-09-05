@@ -15,16 +15,9 @@
  */
 
 import type { Brush, CollisionWorld } from './collision.js';
-import { STEP_SIZE } from './constants.js';
 import { type Vec3, vec3 } from './math.js';
 
-export type MaterialId =
-  | 'floor'
-  | 'wall'
-  | 'platform'
-  | 'cover'
-  | 'accent'
-  | 'stair';
+export type MaterialId = 'floor' | 'wall' | 'platform' | 'cover' | 'accent' | 'stair';
 
 export interface SpawnPoint {
   pos: Vec3;
@@ -124,8 +117,24 @@ const buildBrushes = (): Brush[] => {
     box(-ATRIUM_HALF_X, -ATRIUM_HALF_Y, -64, ATRIUM_HALF_X, ATRIUM_HALF_Y, 0, 'floor'),
 
     // Muros perimetrales.
-    box(-ATRIUM_HALF_X - ATRIUM_WALL_THICKNESS, -ATRIUM_HALF_Y, 0, -ATRIUM_HALF_X, ATRIUM_HALF_Y, ATRIUM_WALL_HEIGHT, 'wall'),
-    box(ATRIUM_HALF_X, -ATRIUM_HALF_Y, 0, ATRIUM_HALF_X + ATRIUM_WALL_THICKNESS, ATRIUM_HALF_Y, ATRIUM_WALL_HEIGHT, 'wall'),
+    box(
+      -ATRIUM_HALF_X - ATRIUM_WALL_THICKNESS,
+      -ATRIUM_HALF_Y,
+      0,
+      -ATRIUM_HALF_X,
+      ATRIUM_HALF_Y,
+      ATRIUM_WALL_HEIGHT,
+      'wall',
+    ),
+    box(
+      ATRIUM_HALF_X,
+      -ATRIUM_HALF_Y,
+      0,
+      ATRIUM_HALF_X + ATRIUM_WALL_THICKNESS,
+      ATRIUM_HALF_Y,
+      ATRIUM_WALL_HEIGHT,
+      'wall',
+    ),
     box(
       -ATRIUM_HALF_X - ATRIUM_WALL_THICKNESS,
       -ATRIUM_HALF_Y - ATRIUM_WALL_THICKNESS,
@@ -216,11 +225,14 @@ export const ATRIUM: GameMap = {
   ],
   bounds: {
     min: vec3(-ATRIUM_HALF_X - ATRIUM_WALL_THICKNESS, -ATRIUM_HALF_Y - ATRIUM_WALL_THICKNESS, -256),
-    max: vec3(ATRIUM_HALF_X + ATRIUM_WALL_THICKNESS, ATRIUM_HALF_Y + ATRIUM_WALL_THICKNESS, ATRIUM_WALL_HEIGHT),
+    max: vec3(
+      ATRIUM_HALF_X + ATRIUM_WALL_THICKNESS,
+      ATRIUM_HALF_Y + ATRIUM_WALL_THICKNESS,
+      ATRIUM_WALL_HEIGHT,
+    ),
   },
   killZ: -256,
 };
-
 
 // --- CONDUIT -----------------------------------------------------------------
 
@@ -248,7 +260,15 @@ const buildConduitBrushes = (): Brush[] => {
     // Muros perimetrales.
     box(-CONDUIT_HALF_X - t, -CONDUIT_HALF_Y, 0, -CONDUIT_HALF_X, CONDUIT_HALF_Y, h, 'wall'),
     box(CONDUIT_HALF_X, -CONDUIT_HALF_Y, 0, CONDUIT_HALF_X + t, CONDUIT_HALF_Y, h, 'wall'),
-    box(-CONDUIT_HALF_X - t, -CONDUIT_HALF_Y - t, 0, CONDUIT_HALF_X + t, -CONDUIT_HALF_Y, h, 'wall'),
+    box(
+      -CONDUIT_HALF_X - t,
+      -CONDUIT_HALF_Y - t,
+      0,
+      CONDUIT_HALF_X + t,
+      -CONDUIT_HALF_Y,
+      h,
+      'wall',
+    ),
     box(-CONDUIT_HALF_X - t, CONDUIT_HALF_Y, 0, CONDUIT_HALF_X + t, CONDUIT_HALF_Y + t, h, 'wall'),
 
     // Bloque central: sin el, los dos spawns se verian de frente.
@@ -292,8 +312,16 @@ export const CONDUIT: GameMap = {
     { pos: vec3(1056, 0, 8), yaw: 180 },
   ],
   bounds: {
-    min: vec3(-CONDUIT_HALF_X - CONDUIT_WALL_THICKNESS, -CONDUIT_HALF_Y - CONDUIT_WALL_THICKNESS, -256),
-    max: vec3(CONDUIT_HALF_X + CONDUIT_WALL_THICKNESS, CONDUIT_HALF_Y + CONDUIT_WALL_THICKNESS, CONDUIT_WALL_HEIGHT),
+    min: vec3(
+      -CONDUIT_HALF_X - CONDUIT_WALL_THICKNESS,
+      -CONDUIT_HALF_Y - CONDUIT_WALL_THICKNESS,
+      -256,
+    ),
+    max: vec3(
+      CONDUIT_HALF_X + CONDUIT_WALL_THICKNESS,
+      CONDUIT_HALF_Y + CONDUIT_WALL_THICKNESS,
+      CONDUIT_WALL_HEIGHT,
+    ),
   },
   killZ: -256,
 };
@@ -309,10 +337,6 @@ export const DEFAULT_MAP = ATRIUM;
 /** Busca un mapa por nombre, sin distinguir mayusculas. `undefined` si no existe. */
 export const getMap = (name: string | null | undefined): GameMap | undefined =>
   name ? MAPS[name.toUpperCase()] : undefined;
-
-/** Comprobacion de invariantes usada por los tests del mapa. */
-export const MAX_STAIR_RISE = STAIR_RISE;
-export const stairFitsStepSize = STAIR_RISE <= STEP_SIZE;
 
 export const createCollisionWorld = (map: GameMap): CollisionWorld => ({
   brushes: map.brushes,

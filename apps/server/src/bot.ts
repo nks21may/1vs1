@@ -100,7 +100,7 @@ const STUCK_SECONDS = 1;
  * `yaw`. El umbral evita que una desviacion minima haga pulsar dos teclas y el
  * bot avance en diagonal cuando queria ir recto.
  */
-export const movementButtons = (yawDeg: number, dx: number, dy: number): number => {
+const movementButtons = (yawDeg: number, dx: number, dy: number): number => {
   const yaw = (yawDeg * Math.PI) / 180;
   const adelante = dx * Math.cos(yaw) + dy * Math.sin(yaw);
   const derecha = dx * Math.sin(yaw) - dy * Math.cos(yaw);
@@ -114,7 +114,6 @@ export const movementButtons = (yawDeg: number, dx: number, dy: number): number 
 };
 
 const MOVE_THRESHOLD = 0.25;
-/** Duracion de un rodeo lateral. */
 
 export class BotController {
   private seq = 0;
@@ -202,11 +201,7 @@ export class BotController {
     const compensation = recoil[1] * this.difficulty.recoilControl;
 
     const maxTurn = this.difficulty.turnSpeed * TICK_DT;
-    const yawDelta = clamp(
-      angleDelta(this.yaw, desiredYaw + jitterYaw),
-      -maxTurn,
-      maxTurn,
-    );
+    const yawDelta = clamp(angleDelta(this.yaw, desiredYaw + jitterYaw), -maxTurn, maxTurn);
     const pitchDelta = clamp(
       desiredPitch + jitterPitch + compensation - this.pitch,
       -maxTurn,

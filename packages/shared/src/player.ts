@@ -86,12 +86,7 @@ const fullMagazines = (): Record<WeaponId, number> => ({
   sniper: getWeapon('sniper').magazine,
 });
 
-export const createPlayer = (
-  id: number,
-  name: string,
-  pos: Vec3,
-  yaw = 0,
-): PlayerState => ({
+export const createPlayer = (id: number, name: string, pos: Vec3, yaw = 0): PlayerState => ({
   id,
   name,
   pos: clone(pos),
@@ -301,10 +296,7 @@ export const simulatePlayerTick = (
  * cliente no, la prediccion divergiria en cada ronda y el jugador veria un
  * tiron al empezar.
  */
-export const applyPhaseRestrictions = (
-  cmd: UserCommand,
-  frozen: boolean,
-): UserCommand => {
+export const applyPhaseRestrictions = (cmd: UserCommand, frozen: boolean): UserCommand => {
   if (!frozen) return cmd;
   // Solo sobreviven las teclas que no alteran la posicion ni el estado del arma.
   return { ...cmd, buttons: cmd.buttons & BUTTON.DUCK, slot: 0 };

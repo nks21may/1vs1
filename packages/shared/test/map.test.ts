@@ -5,14 +5,24 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { ATRIUM, ATRIUM_WORLD, CONDUIT, MAPS, createCollisionWorld, mirrorBrushX } from '../src/map.js';
+import {
+  ATRIUM,
+  ATRIUM_WORLD,
+  CONDUIT,
+  MAPS,
+  STAIR_RISE,
+  createCollisionWorld,
+  mirrorBrushX,
+} from '../src/map.js';
 import { isPositionSolid, traceRay } from '../src/collision.js';
-import { BUTTON, TICK_DT } from '../src/constants.js';
+import { BUTTON, STEP_SIZE, TICK_DT } from '../src/constants.js';
 import { vec3 } from '../src/math.js';
 import { createMoveState, moveStep, playerMaxs, playerMins } from '../src/movement.js';
 
-const key = (b: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }) =>
-  `${b.min.x},${b.min.y},${b.min.z},${b.max.x},${b.max.y},${b.max.z}`;
+const key = (b: {
+  min: { x: number; y: number; z: number };
+  max: { x: number; y: number; z: number };
+}) => `${b.min.x},${b.min.y},${b.min.z},${b.max.x},${b.max.y},${b.max.z}`;
 
 /**
  * Los invariantes se comprueban sobre TODOS los mapas: son las reglas que
@@ -133,6 +143,12 @@ describe('jugabilidad de ATRIUM', () => {
     expect(state.onGround).toBe(true);
   });
 
+  it('la altura de peldano no supera el escalon que sube el motor solo', () => {
+    // Es el invariante del que depende el test anterior: un peldano mas alto
+    // que `STEP_SIZE` obligaria a saltar para subir a los balcones.
+    expect(STAIR_RISE).toBeLessThanOrEqual(STEP_SIZE);
+  });
+
   it('la rampa del spawn se sube de vuelta caminando', () => {
     const state = walk({ x: -700, y: 0, z: 8 }, 180, 256);
     expect(state.pos.z).toBeCloseTo(96, 0);
@@ -170,7 +186,7 @@ describe('jugabilidad de CONDUIT', () => {
         [-PASO, 0],
         [0, PASO],
         [0, -PASO],
-      ]) {
+      ] as const) {
         const nx = x + dx;
         const ny = y + dy;
         if (Math.abs(nx) > 1152 || Math.abs(ny) > 768) continue;

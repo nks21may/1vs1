@@ -83,7 +83,7 @@ export const radToDeg = (rad: number): number => (rad * 180) / Math.PI;
 
 /** Envuelve un angulo en grados al rango [-180, 180). */
 export const normalizeAngle = (deg: number): number => {
-  let a = ((deg + 180) % 360 + 360) % 360;
+  let a = (((deg + 180) % 360) + 360) % 360;
   a -= 180;
   return a === 180 ? -180 : a;
 };

@@ -12,8 +12,7 @@ const newMatch = () => {
 };
 
 /** Avanza el reloj hasta que la fase actual termina. */
-const skipPhase = (match: MatchState): MatchEvent[] =>
-  match.update(match.phaseRemaining + 0.001);
+const skipPhase = (match: MatchState): MatchEvent[] => match.update(match.phaseRemaining + 0.001);
 
 /** Lleva la partida hasta la fase 'live'. */
 const goLive = (match: MatchState) => {
@@ -140,9 +139,7 @@ describe('fin de partida', () => {
     const events = match.removePlayer(2);
     expect(events.some((e) => e.type === 'matchEnd')).toBe(true);
     expect(match.matchWinner).toBe(1);
-    expect(
-      events.find((e) => e.type === 'roundEnd'),
-    ).toMatchObject({ reason: 'forfeit' });
+    expect(events.find((e) => e.type === 'roundEnd')).toMatchObject({ reason: 'forfeit' });
   });
 
   it('quitar a alguien que no juega no cambia nada', () => {

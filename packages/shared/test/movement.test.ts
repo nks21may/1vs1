@@ -165,8 +165,7 @@ describe('salto', () => {
     // La altura continua es v^2/2g (57 unidades), pero al integrar en pasos
     // discretos el apice se mide medio tick tarde: hay que sumar v*dt/2. Ese
     // termino tambien existe en Source y es por lo que 64 tick "salta mas".
-    const expected =
-      (JUMP_IMPULSE * JUMP_IMPULSE) / (2 * GRAVITY) + (JUMP_IMPULSE * TICK_DT) / 2;
+    const expected = (JUMP_IMPULSE * JUMP_IMPULSE) / (2 * GRAVITY) + (JUMP_IMPULSE * TICK_DT) / 2;
     expect(maxZ - startZ).toBeGreaterThan(expected - 0.5);
     expect(maxZ - startZ).toBeLessThan(expected + 0.5);
   });

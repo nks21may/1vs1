@@ -96,10 +96,7 @@ const buildRiflePattern = (shots: number): (readonly [number, number])[] => {
   for (let i = 0; i < shots; i++) {
     // El desplazamiento se anota *antes* de acumular el de esta bala: la
     // primera va exactamente donde apunta la mira (first bullet accuracy).
-    pattern.push([
-      Math.round(yaw * 1000) / 1000,
-      Math.round(pitch * 1000) / 1000,
-    ] as const);
+    pattern.push([Math.round(yaw * 1000) / 1000, Math.round(pitch * 1000) / 1000] as const);
 
     // Subida vertical: agresiva en las 4 primeras balas, luego se aplana.
     const climb = i < 4 ? 1.15 - i * 0.12 : 0.42 + 0.2 * Math.exp(-(i - 4) / 6);
@@ -122,10 +119,7 @@ const buildPistolPattern = (shots: number): (readonly [number, number])[] => {
   let yaw = 0;
   let pitch = 0;
   for (let i = 0; i < shots; i++) {
-    pattern.push([
-      Math.round(yaw * 1000) / 1000,
-      Math.round(pitch * 1000) / 1000,
-    ] as const);
+    pattern.push([Math.round(yaw * 1000) / 1000, Math.round(pitch * 1000) / 1000] as const);
     pitch += 0.75 + i * 0.05;
     yaw += (random() - 0.5) * 0.7;
   }
@@ -283,15 +277,16 @@ export const getWeapon = (id: WeaponId): WeaponDef => WEAPONS[id];
 export const WEAPON_SLOTS: readonly WeaponId[] = ['rifle', 'pistol', 'knife', 'sniper'];
 
 /** Arma de la ranura `slot` (1-based), o `null` si la ranura no existe. */
-export const weaponForSlot = (slot: number): WeaponId | null =>
-  WEAPON_SLOTS[slot - 1] ?? null;
+export const weaponForSlot = (slot: number): WeaponId | null => WEAPON_SLOTS[slot - 1] ?? null;
 
 /**
  * Multiplicador de velocidad del arma, contando el apuntado. Apuntar solo
  * frena si el arma tiene mira: pulsar el boton con la pistola no hace nada.
  */
 export const weaponSpeedMultiplier = (weapon: WeaponDef, aiming: boolean): number =>
-  aiming && weapon.aim ? weapon.speedMultiplier * weapon.aim.speedMultiplier : weapon.speedMultiplier;
+  aiming && weapon.aim
+    ? weapon.speedMultiplier * weapon.aim.speedMultiplier
+    : weapon.speedMultiplier;
 
 /** Contexto de precision en el instante del disparo. */
 export interface AccuracyContext {
@@ -324,10 +319,7 @@ export const computeSpread = (
 };
 
 /** Desplazamiento acumulado del patron para la bala `shotIndex` (0-based). */
-export const getRecoil = (
-  weapon: WeaponDef,
-  shotIndex: number,
-): { yaw: number; pitch: number } => {
+export const getRecoil = (weapon: WeaponDef, shotIndex: number): { yaw: number; pitch: number } => {
   const pattern = weapon.recoilPattern;
   if (pattern.length === 0) return { yaw: 0, pitch: 0 };
   const entry = pattern[Math.min(shotIndex, pattern.length - 1)]!;
@@ -379,11 +371,7 @@ export const shotSeed = (playerId: number, shotCounter: number): number =>
 export type HitGroup = 'head' | 'chest' | 'legs';
 
 /** Dano final segun zona alcanzada y distancia recorrida. */
-export const computeDamage = (
-  weapon: WeaponDef,
-  hitGroup: HitGroup,
-  distance: number,
-): number => {
+export const computeDamage = (weapon: WeaponDef, hitGroup: HitGroup, distance: number): number => {
   let damage = weapon.damage;
   if (hitGroup === 'head') damage *= weapon.headshotMultiplier;
   else if (hitGroup === 'legs') damage *= weapon.legMultiplier;

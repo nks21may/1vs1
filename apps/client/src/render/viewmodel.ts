@@ -19,11 +19,11 @@ import {
   LineSegments,
   Mesh,
   MeshBasicMaterial,
-  Object3D,
 } from 'three';
 
 import { type WeaponId, clamp, getWeapon, lerp } from '@neonduel/shared';
 
+import { disposeObject } from './dispose.js';
 
 const part = (
   width: number,
@@ -43,10 +43,7 @@ const part = (
   // aspecto, es para que three los encole en la pasada transparente, la ultima
   // en dibujarse. Si fueran opacos, la limpieza de profundidad ocurriria antes
   // de las lineas de neon del mapa y estas se verian a traves de las paredes.
-  const mesh = new Mesh(
-    geometry,
-    new MeshBasicMaterial({ color, transparent: true, opacity: 1 }),
-  );
+  const mesh = new Mesh(geometry, new MeshBasicMaterial({ color, transparent: true, opacity: 1 }));
   mesh.renderOrder = RENDER_ORDER_WEAPON;
   group.add(mesh);
 
@@ -191,7 +188,7 @@ export class ViewModel {
     if (weapon === this.currentWeapon) return;
     this.currentWeapon = weapon;
     this.root.remove(this.weaponGroup);
-    disposeGroup(this.weaponGroup);
+    disposeObject(this.weaponGroup);
     this.weaponGroup = buildWeapon(weapon);
     this.root.add(this.weaponGroup);
     // Un pequeno tiron al sacar el arma nueva.
@@ -213,8 +210,7 @@ export class ViewModel {
     reloading: number;
     alive: boolean;
   }): void {
-    const { dt, speed, maxSpeed, onGround, yawDelta, pitchDelta, reloading, alive } =
-      options;
+    const { dt, speed, maxSpeed, onGround, yawDelta, pitchDelta, reloading, alive } = options;
 
     this.root.visible = alive;
     if (!alive) return;
@@ -228,11 +224,7 @@ export class ViewModel {
 
     // Inercia: el arma se retrasa respecto al giro de la vista.
     this.swayYaw = lerp(this.swayYaw, clamp(-yawDelta * 0.06, -3, 3), 1 - Math.exp(-dt * 12));
-    this.swayPitch = lerp(
-      this.swayPitch,
-      clamp(pitchDelta * 0.06, -2, 2),
-      1 - Math.exp(-dt * 12),
-    );
+    this.swayPitch = lerp(this.swayPitch, clamp(pitchDelta * 0.06, -2, 2), 1 - Math.exp(-dt * 12));
 
     this.kick = Math.max(0, this.kick - dt * 9);
     this.reloadProgress = reloading;
@@ -252,16 +244,4 @@ export class ViewModel {
       this.swayPitch * 0.02 + Math.sin(this.reloadProgress * Math.PI) * 0.4,
     );
   }
-
 }
-
-const disposeGroup = (group: Group): void => {
-  group.traverse((object: Object3D) => {
-    if (object instanceof Mesh || object instanceof LineSegments) {
-      object.geometry.dispose();
-      const material = object.material;
-      if (Array.isArray(material)) material.forEach((m) => m.dispose());
-      else material.dispose();
-    }
-  });
-};

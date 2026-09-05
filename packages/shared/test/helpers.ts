@@ -22,27 +22,16 @@ export const flatWorld = (extraBrushes: Brush[] = []): CollisionWorld => ({
 
 let seq = 0;
 
-export const cmd = (
-  buttons: number,
-  yaw = 0,
-  pitch = 0,
-  dt = TICK_DT,
-): UserCommand => ({ seq: seq++, buttons, yaw, pitch, dt });
+export const cmd = (buttons: number, yaw = 0, pitch = 0, dt = TICK_DT): UserCommand => ({
+  seq: seq++,
+  buttons,
+  yaw,
+  pitch,
+  dt,
+});
 
 /** Comando que ademas pide una ranura de arma. */
 export const slotCmd = (slot: number, buttons = 0): UserCommand => ({
   ...cmd(buttons),
   slot,
 });
-
-/** Ejecuta `ticks` comandos identicos y devuelve el estado final. */
-export const runTicks = <T>(
-  ticks: number,
-  step: (command: UserCommand, index: number) => T,
-  buttons = 0,
-  yaw = 0,
-): T | undefined => {
-  let last: T | undefined;
-  for (let i = 0; i < ticks; i++) last = step(cmd(buttons, yaw), i);
-  return last;
-};

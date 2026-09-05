@@ -77,10 +77,7 @@ describe('InterpolationBuffer', () => {
   it('no mezcla los estados discretos', () => {
     const buffer = new InterpolationBuffer(100);
     buffer.push([player(2, 0, 0, SNAPSHOT_FLAG.ALIVE)], 1000);
-    buffer.push(
-      [player(2, 200, 0, SNAPSHOT_FLAG.ALIVE | SNAPSHOT_FLAG.DUCKING)],
-      1100,
-    );
+    buffer.push([player(2, 200, 0, SNAPSHOT_FLAG.ALIVE | SNAPSHOT_FLAG.DUCKING)], 1100);
 
     expect(buffer.sample(1120)[0]!.ducking).toBe(false);
     expect(buffer.sample(1180)[0]!.ducking).toBe(true);

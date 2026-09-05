@@ -42,7 +42,12 @@ const VECINOS: readonly (readonly [number, number])[] = [
 const claveCelda = (cx: number, cy: number): string => `${cx},${cy}`;
 
 /** Altura del suelo en una columna, o `null` si ahi no se puede estar de pie. */
-const alturaDeSuelo = (world: CollisionWorld, x: number, y: number, map: GameMap): number | null => {
+const alturaDeSuelo = (
+  world: CollisionWorld,
+  x: number,
+  y: number,
+  map: GameMap,
+): number | null => {
   const mins = playerMins();
   const maxs = playerMaxs(false);
   const desde = vec3(x, y, map.bounds.max.z - 1);

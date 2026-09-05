@@ -20,14 +20,14 @@ lo publique lo que ya tengas delante.
 
 En **Compute → Instances → Create instance**:
 
-| Campo | Valor |
-|---|---|
-| Shape | `VM.Standard.A1.Flex` (Ampere, ARM) |
+| Campo          | Valor                                                          |
+| -------------- | -------------------------------------------------------------- |
+| Shape          | `VM.Standard.A1.Flex` (Ampere, ARM)                            |
 | OCPU / memoria | 1 OCPU y 6 GB bastan; con 2 OCPU la compilación tarda la mitad |
-| Imagen | Ubuntu 24.04 (**aarch64**) |
-| Claves SSH | sube tu clave pública |
+| Imagen         | Ubuntu 24.04 (**aarch64**)                                     |
+| Claves SSH     | sube tu clave pública                                          |
 
-El *always free* cubre hasta 4 OCPU y 24 GB repartidos entre instancias A1. Este
+El _always free_ cubre hasta 4 OCPU y 24 GB repartidos entre instancias A1. Este
 juego no aprovecha más de un núcleo —es un único proceso con un bucle a 64 Hz—,
 así que lo que sobre es mejor dejarlo libre para otra cosa.
 
@@ -87,10 +87,10 @@ sale desde la máquina hacia Cloudflare y nadie entra de fuera.
    final: las reglas se evalúan en orden y la última se lo traga todo.
 
    ```yaml
-     - hostname: neonduel.nicolasdalessandro.dev
-       service: http://127.0.0.1:8090
+   - hostname: neonduel.nicolasdalessandro.dev
+     service: http://127.0.0.1:8090
 
-     - service: http_status:404
+   - service: http_status:404
    ```
 
 3. Comprueba y recarga:
@@ -150,7 +150,7 @@ la vista y el certificado corre de tu cuenta:
 1. Levanta el juego escuchando hacia fuera: `PUBLISH=0.0.0.0:80` en el `.env`.
 2. **Networking → Virtual Cloud Networks → tu VCN → Subnets → tu subred →
    Security Lists → Add Ingress Rules**: origen `0.0.0.0/0`, TCP, puerto 80.
-3. En Cloudflare, un registro `A` a la IP pública. En **gris** (*DNS only*) el
+3. En Cloudflare, un registro `A` a la IP pública. En **gris** (_DNS only_) el
    trayecto es directo; en naranja vuelves a tener el salto del PoP, y entonces
    el túnel es más cómodo.
 4. Para HTTPS necesitas algo que termine el TLS: el nginx que ya tienes con
@@ -173,19 +173,19 @@ abiertas y los jugadores tienen que volver a emparejarse. Como no hay nada que
 persistir, tampoco hay copias de seguridad que hacer.
 
 Consumo: una partida son unos 15 KB/s en cada sentido, así que el límite de
-salida del *always free* (10 TB al mes) no se acerca ni jugando sin parar. La
+salida del _always free_ (10 TB al mes) no se acerca ni jugando sin parar. La
 imagen ocupa ~230 MB y el proceso ronda los 80 MB de memoria.
 
 ## Cuando algo no responde
 
-| Síntoma | Causa habitual |
-|---|---|
-| `curl localhost:8090/health` falla | El contenedor no arrancó: `docker compose logs` |
-| Error 1033 de Cloudflare | `cloudflared` no está conectado: `systemctl status cloudflared` |
-| 502 desde el túnel | El `service:` del `config.yml` apunta a un puerto donde no hay nada |
-| Sale el 404 del túnel | La regla quedó detrás del `http_status:404`, o el hostname no coincide |
+| Síntoma                                       | Causa habitual                                                           |
+| --------------------------------------------- | ------------------------------------------------------------------------ |
+| `curl localhost:8090/health` falla            | El contenedor no arrancó: `docker compose logs`                          |
+| Error 1033 de Cloudflare                      | `cloudflared` no está conectado: `systemctl status cloudflared`          |
+| 502 desde el túnel                            | El `service:` del `config.yml` apunta a un puerto donde no hay nada      |
+| Sale el 404 del túnel                         | La regla quedó detrás del `http_status:404`, o el hostname no coincide   |
 | Carga la página pero se queda en «conectando» | Algo en medio no deja pasar la actualización a WebSocket (mira el nginx) |
-| «Versión de protocolo incompatible» | Cliente y servidor de compilaciones distintas; recompila la imagen |
+| «Versión de protocolo incompatible»           | Cliente y servidor de compilaciones distintas; recompila la imagen       |
 
 Si expones el puerto directamente y no responde desde fuera, además de la regla
 de la lista de seguridad está el cortafuegos local: la imagen de Ubuntu de Oracle

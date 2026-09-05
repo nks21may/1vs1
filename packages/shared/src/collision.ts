@@ -42,12 +42,7 @@ export interface TraceResult {
 /** Separacion que se mantiene con las superficies para evitar quedar encajado. */
 export const DIST_EPSILON = 0.03125;
 
-const overlaps = (
-  aMin: Vec3,
-  aMax: Vec3,
-  bMin: Vec3,
-  bMax: Vec3,
-): boolean =>
+const overlaps = (aMin: Vec3, aMax: Vec3, bMin: Vec3, bMax: Vec3): boolean =>
   aMin.x <= bMax.x &&
   aMax.x >= bMin.x &&
   aMin.y <= bMax.y &&
@@ -182,16 +177,8 @@ export const traceBox = (
     if (!overlaps(sweepMin, sweepMax, brush.min, brush.max)) continue;
 
     // Suma de Minkowski: expandimos el brush por el tamano del jugador.
-    const expMin = vec3(
-      brush.min.x - maxs.x,
-      brush.min.y - maxs.y,
-      brush.min.z - maxs.z,
-    );
-    const expMax = vec3(
-      brush.max.x - mins.x,
-      brush.max.y - mins.y,
-      brush.max.z - mins.z,
-    );
+    const expMin = vec3(brush.min.x - maxs.x, brush.min.y - maxs.y, brush.min.z - maxs.z);
+    const expMax = vec3(brush.max.x - mins.x, brush.max.y - mins.y, brush.max.z - mins.z);
 
     const result = sweepPointVsBox(start, delta, expMin, expMax, deltaLength);
     if (!result) continue;
@@ -254,14 +241,9 @@ export const isPositionSolid = (
  * Proyecta `velocity` sobre el plano de `normal` para deslizar por la superficie.
  * `overbounce` > 1 despega ligeramente al jugador y evita re-colisiones inmediatas.
  */
-export const clipVelocity = (
-  velocity: Vec3,
-  normal: Vec3,
-  overbounce = 1.0,
-): Vec3 => {
+export const clipVelocity = (velocity: Vec3, normal: Vec3, overbounce = 1.0): Vec3 => {
   const backoff =
-    (velocity.x * normal.x + velocity.y * normal.y + velocity.z * normal.z) *
-    overbounce;
+    (velocity.x * normal.x + velocity.y * normal.y + velocity.z * normal.z) * overbounce;
   return vec3(
     velocity.x - normal.x * backoff,
     velocity.y - normal.y * backoff,

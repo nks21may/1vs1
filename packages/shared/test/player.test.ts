@@ -17,12 +17,7 @@ const world = flatWorld();
 const newPlayer = () => createPlayer(1, 'TEST', vec3(0, 0, 1));
 
 /** Ejecuta `ticks` comandos y devuelve todos los eventos generados. */
-const run = (
-  player: ReturnType<typeof newPlayer>,
-  ticks: number,
-  buttons: number,
-  yaw = 0,
-) => {
+const run = (player: ReturnType<typeof newPlayer>, ticks: number, buttons: number, yaw = 0) => {
   const events = [];
   for (let i = 0; i < ticks; i++) {
     events.push(simulatePlayerTick(player, cmd(buttons, yaw), world));
@@ -263,10 +258,7 @@ describe('determinismo de la simulacion completa', () => {
   it('reproducir los mismos comandos da el mismo estado', () => {
     const commands = Array.from({ length: 200 }, (_, i) => ({
       seq: i,
-      buttons:
-        (i % 5 === 0 ? BUTTON.JUMP : 0) |
-        BUTTON.FORWARD |
-        (i % 3 === 0 ? BUTTON.ATTACK : 0),
+      buttons: (i % 5 === 0 ? BUTTON.JUMP : 0) | BUTTON.FORWARD | (i % 3 === 0 ? BUTTON.ATTACK : 0),
       yaw: Math.sin(i / 10) * 40,
       pitch: Math.cos(i / 13) * 10,
       dt: TICK_DT,

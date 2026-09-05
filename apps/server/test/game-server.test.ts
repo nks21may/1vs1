@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ATRIUM,
-  ATRIUM_WORLD,
   BUTTON,
   DEFAULT_MATCH_CONFIG,
   createPlayer,
@@ -206,15 +205,9 @@ describe('bot', () => {
   });
 
   it('los niveles de dificultad estan ordenados', () => {
-    expect(BOT_DIFFICULTIES.easy.aimError).toBeGreaterThan(
-      BOT_DIFFICULTIES.hard.aimError,
-    );
-    expect(BOT_DIFFICULTIES.easy.reactionTime).toBeGreaterThan(
-      BOT_DIFFICULTIES.hard.reactionTime,
-    );
-    expect(BOT_DIFFICULTIES.hard.turnSpeed).toBeGreaterThan(
-      BOT_DIFFICULTIES.easy.turnSpeed,
-    );
+    expect(BOT_DIFFICULTIES.easy.aimError).toBeGreaterThan(BOT_DIFFICULTIES.hard.aimError);
+    expect(BOT_DIFFICULTIES.easy.reactionTime).toBeGreaterThan(BOT_DIFFICULTIES.hard.reactionTime);
+    expect(BOT_DIFFICULTIES.hard.turnSpeed).toBeGreaterThan(BOT_DIFFICULTIES.easy.turnSpeed);
   });
 });
 

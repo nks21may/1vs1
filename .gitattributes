@@ -1,0 +1,7 @@
+# `core.autocrlf` esta activado en muchas maquinas Windows, y con el los ficheros
+# llegan al disco con CRLF. Prettier comprueba el final de linea, asi que sin
+# esto `npm run lint` saldria en rojo en Windows por algo que nadie ha escrito.
+* text=auto eol=lf
+
+# Binarios: ni conversion ni diff de texto.
+*.png binary

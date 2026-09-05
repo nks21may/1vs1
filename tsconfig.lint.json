@@ -1,0 +1,28 @@
+{
+  // Solo para el linter: el build de verdad son los tres tsconfig de cada
+  // paquete, que separan a proposito lo que ve el cliente (DOM) de lo que ve el
+  // servidor (Node). Aqui se juntan porque typescript-eslint necesita un unico
+  // programa que abarque tambien los tests y los ficheros de configuracion, que
+  // el build no compila.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "paths": {
+      "@neonduel/shared": ["./packages/shared/src/index.ts"]
+    }
+  },
+  "include": [
+    "packages/*/src/**/*.ts",
+    "packages/*/test/**/*.ts",
+    "apps/*/src/**/*.ts",
+    "apps/*/test/**/*.ts",
+    "vitest.config.ts",
+    "apps/*/vite.config.ts"
+  ]
+}

@@ -18,7 +18,7 @@
   --magenta: #ff3ea5;
   --amber: #ffd166;
   --danger: #ff4d5e;
-  --font: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --font: ui-monospace, 'SF Mono', 'Cascadia Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
   --hud-pad: clamp(12px, 2.2vw, 32px);
 }
 
@@ -172,11 +172,7 @@ body:not(.playing) #viewport {
   position: absolute;
   inset: 0;
   opacity: 0;
-  background: radial-gradient(
-    ellipse at center,
-    transparent 42%,
-    rgba(255, 40, 70, 0.42) 100%
-  );
+  background: radial-gradient(ellipse at center, transparent 42%, rgba(255, 40, 70, 0.42) 100%);
   transition: opacity 320ms ease-out;
 }
 

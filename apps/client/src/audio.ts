@@ -13,19 +13,59 @@ import { type Vec3, vec3 } from '@neonduel/shared';
 
 import { listenerVectors, toAudioCoords } from './spatial.js';
 
-/** Coloca un nodo espacial, por los dos caminos que existen segun navegador. */
-const setNodePosition = (node: PannerNode, v: Vec3): void => {
-  if (node.positionX) {
-    node.positionX.value = v.x;
-    node.positionY.value = v.y;
-    node.positionZ.value = v.z;
-    return;
-  }
-  node.setPosition?.(v.x, v.y, v.z);
+/**
+ * Safari por debajo de la 14 no tiene los `AudioParam` del panner ni del
+ * oyente: solo tiene los metodos que el estandar ya marca como obsoletos. Los
+ * tipos del DOM dan los `AudioParam` por seguros, asi que el navegador viejo
+ * hay que describirlo aparte para poder preguntar por el sin mentir.
+ */
+type PannerParams = Pick<PannerNode, 'positionX' | 'positionY' | 'positionZ'>;
+type ListenerParams = Pick<
+  AudioListener,
+  | 'positionX'
+  | 'positionY'
+  | 'positionZ'
+  | 'forwardX'
+  | 'forwardY'
+  | 'forwardZ'
+  | 'upX'
+  | 'upY'
+  | 'upZ'
+>;
+
+type LegacyPanner = Partial<PannerParams> & {
+  setPosition?: (x: number, y: number, z: number) => void;
 };
 
-const distanceBetween = (a: Vec3, b: Vec3): number =>
-  Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+type LegacyListener = Partial<ListenerParams> & {
+  setPosition?: (x: number, y: number, z: number) => void;
+  setOrientation?: (fx: number, fy: number, fz: number, ux: number, uy: number, uz: number) => void;
+};
+
+/**
+ * Los `AudioParam` llegaron todos de una vez, asi que basta con mirar uno: o
+ * estan todos o el navegador es de los viejos y solo tiene los metodos.
+ */
+const pannerParams = (node: LegacyPanner): PannerParams | null =>
+  node.positionX ? (node as PannerParams) : null;
+
+const listenerParams = (listener: LegacyListener): ListenerParams | null =>
+  listener.positionX ? (listener as ListenerParams) : null;
+
+/** Coloca un nodo espacial, por los dos caminos que existen segun navegador. */
+const setNodePosition = (node: PannerNode, v: Vec3): void => {
+  const panner: LegacyPanner = node;
+  const params = pannerParams(panner);
+  if (params) {
+    params.positionX.value = v.x;
+    params.positionY.value = v.y;
+    params.positionZ.value = v.z;
+    return;
+  }
+  panner.setPosition?.(v.x, v.y, v.z);
+};
+
+const distanceBetween = (a: Vec3, b: Vec3): number => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 
 export type SoundName =
   | 'rifle'
@@ -62,17 +102,21 @@ export class AudioEngine {
       void this.context.resume();
       return;
     }
-    const Ctor = window.AudioContext ?? (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    // Mismo caso que el panner: en Safari viejo solo existe el constructor
+    // prefijado, aunque los tipos del DOM den `AudioContext` por seguro.
+    const win: Partial<typeof globalThis> & { webkitAudioContext?: typeof AudioContext } = window;
+    const Ctor = win.AudioContext ?? win.webkitAudioContext;
     if (!Ctor) return;
 
-    this.context = new Ctor();
-    this.master = this.context.createGain();
+    const ctx = new Ctor();
+    this.context = ctx;
+    this.master = ctx.createGain();
     this.master.gain.value = this.volume;
-    this.master.connect(this.context.destination);
+    this.master.connect(ctx.destination);
 
     // Un segundo de ruido blanco reutilizable: la base de disparos y pasos.
-    const length = this.context.sampleRate;
-    const buffer = this.context.createBuffer(1, length, this.context.sampleRate);
+    const length = ctx.sampleRate;
+    const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
     this.noiseBuffer = buffer;
@@ -95,20 +139,21 @@ export class AudioEngine {
     this.listenerPos = position;
     const pos = toAudioCoords(position);
     const { forward, up } = listenerVectors(yawDeg, pitchDeg);
-    const listener = ctx.listener;
+    const listener: LegacyListener = ctx.listener;
 
     // Los navegadores viejos solo tienen los metodos, y los nuevos solo los
     // AudioParam; hay que soportar los dos caminos.
-    if (listener.positionX) {
-      listener.positionX.value = pos.x;
-      listener.positionY.value = pos.y;
-      listener.positionZ.value = pos.z;
-      listener.forwardX.value = forward.x;
-      listener.forwardY.value = forward.y;
-      listener.forwardZ.value = forward.z;
-      listener.upX.value = up.x;
-      listener.upY.value = up.y;
-      listener.upZ.value = up.z;
+    const params = listenerParams(listener);
+    if (params) {
+      params.positionX.value = pos.x;
+      params.positionY.value = pos.y;
+      params.positionZ.value = pos.z;
+      params.forwardX.value = forward.x;
+      params.forwardY.value = forward.y;
+      params.forwardZ.value = forward.z;
+      params.upX.value = up.x;
+      params.upY.value = up.y;
+      params.upZ.value = up.z;
       return;
     }
     listener.setPosition?.(pos.x, pos.y, pos.z);
@@ -149,7 +194,13 @@ export class AudioEngine {
     switch (name) {
       case 'rifle':
         this.gunshot(gain, now, {
-          sub: 48, body: 82, crack: 1400, duration: 0.34, level: 0.46, punch: 0.42, weight: 1,
+          sub: 48,
+          body: 82,
+          crack: 1400,
+          duration: 0.34,
+          level: 0.46,
+          punch: 0.42,
+          weight: 1,
           tail: 1.6,
         });
         break;
@@ -157,7 +208,13 @@ export class AudioEngine {
         // Mas grave y mas larga que el rifle: un disparo que se oye en todo el
         // mapa y que delata al tirador durante un buen rato.
         this.gunshot(gain, now, {
-          sub: 38, body: 68, crack: 1150, duration: 0.55, level: 0.5, punch: 0.62, weight: 1.15,
+          sub: 38,
+          body: 68,
+          crack: 1150,
+          duration: 0.55,
+          level: 0.5,
+          punch: 0.62,
+          weight: 1.15,
           tail: 2.1,
         });
         break;
@@ -166,7 +223,13 @@ export class AudioEngine {
         // Mas seca que el rifle: apenas sub, cuerpo mas alto y cola corta. No es
         // el mismo disparo mas agudo, es otro golpe.
         this.gunshot(gain, now, {
-          sub: 70, body: 200, crack: 2000, duration: 0.19, level: 0.64, punch: 0.2, weight: 0.5,
+          sub: 70,
+          body: 200,
+          crack: 2000,
+          duration: 0.19,
+          level: 0.64,
+          punch: 0.2,
+          weight: 0.5,
           tail: 0.9,
         });
         break;
@@ -175,10 +238,17 @@ export class AudioEngine {
         // rafagas de ruido a frecuencias distintas porque el barrido descendente
         // es lo que se lee como "algo ha pasado por delante".
         this.noise(gain, now, {
-          duration: 0.07, frequency: 3400, q: 0.8, level: 0.24, highpass: true,
+          duration: 0.07,
+          frequency: 3400,
+          q: 0.8,
+          level: 0.24,
+          highpass: true,
         });
         this.noise(gain, now + 0.03, {
-          duration: 0.1, frequency: 1250, q: 1.4, level: 0.18,
+          duration: 0.1,
+          frequency: 1250,
+          q: 1.4,
+          level: 0.18,
         });
         break;
       case 'impact':

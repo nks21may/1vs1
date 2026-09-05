@@ -103,48 +103,24 @@ describe('computeSpread', () => {
   const maxSpeed = 250;
 
   it('quieto y de pie es casi perfecto', () => {
-    const spread = computeSpread(
-      RIFLE,
-      { speed: 0, onGround: true, ducking: false },
-      maxSpeed,
-    );
+    const spread = computeSpread(RIFLE, { speed: 0, onGround: true, ducking: false }, maxSpeed);
     expect(spread).toBeCloseTo(RIFLE.spread.base, 6);
   });
 
   it('correr penaliza mucho mas que andar despacio', () => {
-    const slow = computeSpread(
-      RIFLE,
-      { speed: 60, onGround: true, ducking: false },
-      maxSpeed,
-    );
-    const fast = computeSpread(
-      RIFLE,
-      { speed: 250, onGround: true, ducking: false },
-      maxSpeed,
-    );
+    const slow = computeSpread(RIFLE, { speed: 60, onGround: true, ducking: false }, maxSpeed);
+    const fast = computeSpread(RIFLE, { speed: 250, onGround: true, ducking: false }, maxSpeed);
     expect(fast).toBeGreaterThan(slow * 5);
   });
 
   it('saltar hace el arma poco fiable', () => {
-    const air = computeSpread(
-      RIFLE,
-      { speed: 0, onGround: false, ducking: false },
-      maxSpeed,
-    );
+    const air = computeSpread(RIFLE, { speed: 0, onGround: false, ducking: false }, maxSpeed);
     expect(air).toBeGreaterThan(RIFLE.spread.air);
   });
 
   it('agacharse mejora la precision', () => {
-    const standing = computeSpread(
-      RIFLE,
-      { speed: 0, onGround: true, ducking: false },
-      maxSpeed,
-    );
-    const ducked = computeSpread(
-      RIFLE,
-      { speed: 0, onGround: true, ducking: true },
-      maxSpeed,
-    );
+    const standing = computeSpread(RIFLE, { speed: 0, onGround: true, ducking: false }, maxSpeed);
+    const ducked = computeSpread(RIFLE, { speed: 0, onGround: true, ducking: true }, maxSpeed);
     expect(ducked).toBeLessThan(standing);
   });
 });
@@ -167,13 +143,7 @@ describe('computeShotAngles', () => {
   it('la dispersion nunca excede el radio indicado', () => {
     const spread = 3;
     for (let i = 0; i < 500; i++) {
-      const angles = computeShotAngles(
-        RIFLE,
-        { yaw: 0, pitch: 0 },
-        0,
-        spread,
-        shotSeed(1, i),
-      );
+      const angles = computeShotAngles(RIFLE, { yaw: 0, pitch: 0 }, 0, spread, shotSeed(1, i));
       const recoil = getRecoil(RIFLE, 0);
       const dx = angles.yaw - recoil.yaw;
       const dy = angles.pitch + recoil.pitch;
@@ -198,9 +168,7 @@ describe('computeDamage', () => {
   });
 
   it('las piernas hacen menos dano que el torso', () => {
-    expect(computeDamage(RIFLE, 'legs', 100)).toBeLessThan(
-      computeDamage(RIFLE, 'chest', 100),
-    );
+    expect(computeDamage(RIFLE, 'legs', 100)).toBeLessThan(computeDamage(RIFLE, 'chest', 100));
   });
 
   it('el dano decae con la distancia pero nunca a cero', () => {
@@ -212,8 +180,7 @@ describe('computeDamage', () => {
 
   it('la pistola pierde eficacia mas rapido que el rifle', () => {
     const rifleRatio = computeDamage(RIFLE, 'chest', 3000) / computeDamage(RIFLE, 'chest', 0);
-    const pistolRatio =
-      computeDamage(PISTOL, 'chest', 3000) / computeDamage(PISTOL, 'chest', 0);
+    const pistolRatio = computeDamage(PISTOL, 'chest', 3000) / computeDamage(PISTOL, 'chest', 0);
     expect(pistolRatio).toBeLessThan(rifleRatio);
   });
 });
@@ -265,9 +232,7 @@ describe('rifle de precision', () => {
   });
 
   it('apuntar cuesta movilidad', () => {
-    expect(weaponSpeedMultiplier(SNIPER, true)).toBeLessThan(
-      weaponSpeedMultiplier(SNIPER, false),
-    );
+    expect(weaponSpeedMultiplier(SNIPER, true)).toBeLessThan(weaponSpeedMultiplier(SNIPER, false));
     // Y llevarla ya pesa mas que llevar el rifle.
     expect(SNIPER.speedMultiplier).toBeLessThan(RIFLE.speedMultiplier);
   });

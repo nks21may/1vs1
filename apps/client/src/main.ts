@@ -12,37 +12,48 @@ import { renderStatsRows, type StatsRow } from './hud.js';
 import type { ConnectionStatus } from './game/net.js';
 import { loadSettings, saveSettings, type Settings } from './game/settings.js';
 
-const byId = <T extends HTMLElement>(id: string): T => {
+const byId = (id: string): HTMLElement => {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Falta el elemento: ${id}`);
-  return element as T;
+  return element;
 };
 
-const canvas = byId<HTMLCanvasElement>('viewport');
+/**
+ * Igual, pero comprobando ademas que el elemento es de la clase que se espera.
+ * Antes esto era un parametro de tipo, es decir un `as` sin verificar: si el
+ * HTML cambiaba, el fallo aparecia mucho despues y lejos de la causa.
+ */
+const byIdOf = <T extends HTMLElement>(id: string, type: new () => T): T => {
+  const element = byId(id);
+  if (!(element instanceof type)) throw new Error(`El elemento ${id} no es un ${type.name}`);
+  return element;
+};
+
+const canvas = byIdOf('viewport', HTMLCanvasElement);
 const menu = byId('menu');
 const pause = byId('pause');
 const menuStatus = byId('menu-status');
-const menuForm = byId<HTMLFormElement>('menu-form');
-const nameInput = byId<HTMLInputElement>('name-input');
-const playOnline = byId<HTMLButtonElement>('play-online');
-const playBot = byId<HTMLButtonElement>('play-bot');
-const difficulty = byId<HTMLFieldSetElement>('difficulty');
-const mapChoice = byId<HTMLFieldSetElement>('map-choice');
-const resumeButton = byId<HTMLButtonElement>('resume');
-const leaveButton = byId<HTMLButtonElement>('leave');
-const summary = byId<HTMLElement>('summary');
-const summaryTitle = byId<HTMLElement>('summary-title');
-const summaryRows = byId<HTMLElement>('summary-rows');
-const summaryClose = byId<HTMLButtonElement>('summary-close');
+const menuForm = byIdOf('menu-form', HTMLFormElement);
+const nameInput = byIdOf('name-input', HTMLInputElement);
+const playOnline = byIdOf('play-online', HTMLButtonElement);
+const playBot = byIdOf('play-bot', HTMLButtonElement);
+const difficulty = byIdOf('difficulty', HTMLFieldSetElement);
+const mapChoice = byIdOf('map-choice', HTMLFieldSetElement);
+const resumeButton = byIdOf('resume', HTMLButtonElement);
+const leaveButton = byIdOf('leave', HTMLButtonElement);
+const summary = byId('summary');
+const summaryTitle = byId('summary-title');
+const summaryRows = byId('summary-rows');
+const summaryClose = byIdOf('summary-close', HTMLButtonElement);
 
 const controls = {
-  sensitivity: byId<HTMLInputElement>('sensitivity'),
-  fov: byId<HTMLInputElement>('fov'),
-  volume: byId<HTMLInputElement>('volume'),
-  invertY: byId<HTMLInputElement>('invert-y'),
-  bloom: byId<HTMLInputElement>('bloom'),
-  netgraph: byId<HTMLInputElement>('netgraph-toggle'),
-  bhopCue: byId<HTMLInputElement>('bhop-cue'),
+  sensitivity: byIdOf('sensitivity', HTMLInputElement),
+  fov: byIdOf('fov', HTMLInputElement),
+  volume: byIdOf('volume', HTMLInputElement),
+  invertY: byIdOf('invert-y', HTMLInputElement),
+  bloom: byIdOf('bloom', HTMLInputElement),
+  netgraph: byIdOf('netgraph-toggle', HTMLInputElement),
+  bhopCue: byIdOf('bhop-cue', HTMLInputElement),
 };
 
 const labels = {
@@ -228,7 +239,7 @@ leaveButton.addEventListener('click', () => {
 
 // Volver a capturar el ratón haciendo clic en el lienzo tras perder el foco.
 canvas.addEventListener('click', () => {
-  if (inMatch && pause.hidden === false) game?.requestPointerLock();
+  if (inMatch && !pause.hidden) game?.requestPointerLock();
 });
 
 // Evita cerrar la pestaña por accidente en mitad de un duelo.

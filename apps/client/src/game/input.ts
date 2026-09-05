@@ -26,7 +26,7 @@ export interface InputBindings {
   stats: string[];
 }
 
-export const DEFAULT_BINDINGS: InputBindings = {
+const DEFAULT_BINDINGS: InputBindings = {
   forward: ['KeyW', 'ArrowUp'],
   back: ['KeyS', 'ArrowDown'],
   left: ['KeyA', 'ArrowLeft'],

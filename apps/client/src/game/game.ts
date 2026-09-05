@@ -50,11 +50,7 @@ import { PALETTE, applyViewAngles, createRenderContext, toThree } from '../rende
 import { ViewModel } from '../render/viewmodel.js';
 import { buildWorldMesh, disposeWorldMesh } from '../render/world.js';
 import { InterpolationBuffer, type InterpolatedPlayer } from './interpolation.js';
-import {
-  type DeathCamera,
-  createDeathCamera,
-  updateDeathCamera,
-} from './deathcam.js';
+import { type DeathCamera, createDeathCamera, updateDeathCamera } from './deathcam.js';
 import { InputManager } from './input.js';
 import { NetClient, type ConnectionStatus, buildServerUrl } from './net.js';
 import { PredictionSystem } from './prediction.js';
@@ -401,11 +397,7 @@ export class Game {
 
     const weapon = getWeapon(player.weapon);
     const speed = length2D(player.vel);
-    const maxSpeed = maxSpeedFor(
-      0,
-      player.ducking,
-      weaponSpeedMultiplier(weapon, player.aiming),
-    );
+    const maxSpeed = maxSpeedFor(0, player.ducking, weaponSpeedMultiplier(weapon, player.aiming));
     this.updateZoom(weapon, player.aiming, dt);
 
     this.viewModel.setWeapon(player.weapon);
@@ -416,8 +408,7 @@ export class Game {
       onGround: player.onGround,
       yawDelta: player.yaw - this.lastYaw,
       pitchDelta: player.pitch - this.lastPitch,
-      reloading:
-        player.reloadRemaining > 0 ? 1 - player.reloadRemaining / weapon.reloadTime : 0,
+      reloading: player.reloadRemaining > 0 ? 1 - player.reloadRemaining / weapon.reloadTime : 0,
       alive: player.alive,
     });
     this.lastYaw = player.yaw;
@@ -674,6 +665,4 @@ export class Game {
     const player = message.players.find((p) => p.id === id);
     return player ? vec3(player.x, player.y, player.z) : undefined;
   }
-
 }
-

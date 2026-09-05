@@ -90,10 +90,7 @@ export class EffectSystem {
       flash.visible = false;
 
       const geometry = new BufferGeometry();
-      geometry.setAttribute(
-        'position',
-        new BufferAttribute(new Float32Array(SPARK_COUNT * 3), 3),
-      );
+      geometry.setAttribute('position', new BufferAttribute(new Float32Array(SPARK_COUNT * 3), 3));
       const sparks = new Points(
         geometry,
         new PointsMaterial({

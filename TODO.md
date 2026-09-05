@@ -49,7 +49,7 @@ así se pudra.
   función devuelve 0.42").
 - Cobertura sin bajar del 90% en `packages/shared` y `apps/server`.
 - Sin código muerto: nada de tipos o funciones "para más adelante".
-- Comentarios solo donde expliquen un *porqué* que no se lea en el código.
+- Comentarios solo donde expliquen un _porqué_ que no se lea en el código.
 - README actualizado si cambia algo que un jugador o quien despliegue deba saber.
 
 ---
@@ -57,11 +57,11 @@ así se pudra.
 ## P1 — Lo que más se nota jugando
 
 - [x] **T17. Quitar los dientes de sierra (antialiasing real)**
-  El renderer se crea con `antialias: true`, pero **no sirve de nada mientras el
-  bloom esté encendido**: con post-proceso, la imagen final la produce el
-  `EffectComposer` sobre su propio render target, y el multisampling del canvas se
-  queda sin usar. Por eso se ven escalonadas las aristas, que además es justo lo
-  que más abunda en este mapa (geometría de cajas y líneas de neón).
+      El renderer se crea con `antialias: true`, pero **no sirve de nada mientras el
+      bloom esté encendido**: con post-proceso, la imagen final la produce el
+      `EffectComposer` sobre su propio render target, y el multisampling del canvas se
+      queda sin usar. Por eso se ven escalonadas las aristas, que además es justo lo
+      que más abunda en este mapa (geometría de cajas y líneas de neón).
   - Dónde: [scene.ts](apps/client/src/render/scene.ts), donde hoy se hace
     `new EffectComposer(renderer)` sin más.
   - Camino recomendado: pasarle un `WebGLRenderTarget` propio con `samples: 4`
@@ -89,13 +89,13 @@ así se pudra.
     debe exponerse como ajuste junto a «Brillo (bloom)» sigue sin poder decidirse.
 
 - [ ] **T19. Strafe** — ❓ **POR DEFINIR (pedida el 2026-09-04 por Nicolás).**
-  No la cojas en una iteración automática hasta que tenga alcance: implementarla
-  a ojo es lo mismo que inventarse el encargo.
-  **Lo que ya existe** (y por eso hace falta concretar): el air-strafing con
-  aceleración de Quake, el counter-strafe que frena en seco por debajo de
-  `STOP_SPEED`, y el bunnyhop con ventana de 150 ms y techo relativo al arma.
-  Están en [movement.ts](packages/shared/src/movement.ts), documentados en el
-  README y con tests que comprueban altura de salto, frenada y cadena de saltos.
+      No la cojas en una iteración automática hasta que tenga alcance: implementarla
+      a ojo es lo mismo que inventarse el encargo.
+      **Lo que ya existe** (y por eso hace falta concretar): el air-strafing con
+      aceleración de Quake, el counter-strafe que frena en seco por debajo de
+      `STOP_SPEED`, y el bunnyhop con ventana de 150 ms y techo relativo al arma.
+      Están en [movement.ts](packages/shared/src/movement.ts), documentados en el
+      README y con tests que comprueban altura de salto, frenada y cadena de saltos.
   - Lecturas posibles de "añadir strafe", por si alguna es la buena:
     - **Aprenderlo**: hoy no hay forma de saber si strafeas bien. El HUD tiene
       velocidad, pero no dice cuánta ganas por salto ni si el girón llega tarde.
@@ -110,9 +110,9 @@ así se pudra.
   - Hecho cuando: esté escrito aquí qué de lo anterior es, con su criterio propio.
 
 - [ ] **T18. Disparos más graves y con más cuerpo**
-  Suenan finos y secos. El rifle usa un cuerpo de 150 Hz con un chasquido de
-  2400 Hz y 0,24 s de cola ([audio.ts](apps/client/src/audio.ts), método
-  `gunshot`); falta el golpe de pecho que hace que un arma se sienta potente.
+      Suenan finos y secos. El rifle usa un cuerpo de 150 Hz con un chasquido de
+      2400 Hz y 0,24 s de cola ([audio.ts](apps/client/src/audio.ts), método
+      `gunshot`); falta el golpe de pecho que hace que un arma se sienta potente.
   - Por dónde empezar: bajar el cuerpo a la zona de 70-90 Hz con caída rápida,
     añadir una capa sub-grave breve, bajar el chasquido a 1200-1600 Hz para que
     acompañe en vez de dominar, alargar algo la cola y pasar el conjunto por un
@@ -134,17 +134,17 @@ así se pudra.
     82 Hz, sub a 48 Hz, chasquido a 1400 Hz. Medido en Chrome renderizando cada
     disparo con `OfflineAudioContext` (banco: `audio-preview.html`), ocho
     disparos por arma:
-    | | rifle antes | rifle ahora | pistola antes | pistola ahora |
-    |---|---|---|---|---|
-    | centroide espectral | 1478 Hz | 521 Hz | 1701 Hz | 708 Hz |
-    | energía en 20-60 Hz | 0,5% | 29,2% | 0% | 9,1% |
-    | energía por encima de 160 Hz | 39% | 46% | 79% | 47% |
-    | cola audible | 249 ms | 442 ms | 170 ms | 189 ms |
-    | pico (volumen al máximo) | 0,89 | 0,72 | 0,78 | 0,60 |
-    | pico de la ráfaga a cadencia real | 1,03 (satura) | 0,90 | 0,79 | 0,81 |
-    La energía por encima de 160 Hz **sube** en el rifle (39% → 46%), que es el
-    seguro contra pasarse de graves: aunque un portátil se coma el sub entero,
-    queda más disparo que antes. De paso, la ráfaga del rifle ya no satura.
+    |                                                                             | rifle antes   | rifle ahora | pistola antes | pistola ahora |
+    | --------------------------------------------------------------------------- | ------------- | ----------- | ------------- | ------------- |
+    | centroide espectral                                                         | 1478 Hz       | 521 Hz      | 1701 Hz       | 708 Hz        |
+    | energía en 20-60 Hz                                                         | 0,5%          | 29,2%       | 0%            | 9,1%          |
+    | energía por encima de 160 Hz                                                | 39%           | 46%         | 79%           | 47%           |
+    | cola audible                                                                | 249 ms        | 442 ms      | 170 ms        | 189 ms        |
+    | pico (volumen al máximo)                                                    | 0,89          | 0,72        | 0,78          | 0,60          |
+    | pico de la ráfaga a cadencia real                                           | 1,03 (satura) | 0,90        | 0,79          | 0,81          |
+    | La energía por encima de 160 Hz **sube** en el rifle (39% → 46%), que es el |
+    | seguro contra pasarse de graves: aunque un portátil se coma el sub entero,  |
+    | queda más disparo que antes. De paso, la ráfaga del rifle ya no satura.     |
   - **Ojo con esto:** la correlación media entre disparos sube de 0,28 a 0,50
     (media de los 28 pares). Es inherente a que ahora manda una capa tonal grave
     y no el ruido; se ha compensado ampliando el detune a ±8% y variando también
@@ -156,9 +156,9 @@ así se pudra.
     `audio-preview.html`.
 
 - [x] **T01. Pasos audibles del rival**
-  Hoy solo se oyen los pasos propios: el rival se mueve en silencio absoluto, y en
-  un juego de duelos el sonido *es* información. El evento `step` ya está definido
-  en el protocolo pero no lo emite nadie (código muerto que esta tarea resuelve).
+      Hoy solo se oyen los pasos propios: el rival se mueve en silencio absoluto, y en
+      un juego de duelos el sonido _es_ información. El evento `step` ya está definido
+      en el protocolo pero no lo emite nadie (código muerto que esta tarea resuelve).
   - Dónde: emitir desde [session.ts](apps/server/src/session.ts) cuando un jugador
     supera cierta velocidad en el suelo, con cadencia dependiente de la velocidad;
     consumirlo en [game.ts](apps/client/src/game/game.ts).
@@ -186,10 +186,10 @@ así se pudra.
     de 216 u/s, que cuadra con las ~40 zancadas teoricas.
 
 - [x] **T02. Sonido posicional real**
-  El audio solo atenúa por distancia ([audio.ts](apps/client/src/audio.ts)): un
-  disparo a la espalda suena igual que uno de frente. Con `PannerNode` (HRTF) y la
-  orientación de la cámara se sabría de dónde viene, que junto a T01 es la mitad
-  del juego de información.
+      El audio solo atenúa por distancia ([audio.ts](apps/client/src/audio.ts)): un
+      disparo a la espalda suena igual que uno de frente. Con `PannerNode` (HRTF) y la
+      orientación de la cámara se sabría de dónde viene, que junto a T01 es la mitad
+      del juego de información.
   - Hecho cuando: los sonidos con posición se emiten por un `PannerNode` orientado
     con la vista del jugador, y hay un test de la conversión de coordenadas del
     juego (Z-up) a las del listener de WebAudio (Y-up).
@@ -216,9 +216,9 @@ así se pudra.
     reproduce, en vez de sonar plano y a todo volumen.
 
 - [x] **T03. Cámara de muerte**
-  Al morir la vista se queda congelada donde estaba. Debería girar hacia quien te
-  mató y seguirle hasta el fin de la ronda: informa de dónde vino el disparo y
-  quita la sensación de corte seco.
+      Al morir la vista se queda congelada donde estaba. Debería girar hacia quien te
+      mató y seguirle hasta el fin de la ronda: informa de dónde vino el disparo y
+      quita la sensación de corte seco.
   - Hecho cuando: al morir la cámara interpola hacia el asesino y le sigue; si la
     muerte fue por caída, se queda mirando el punto de impacto.
   - **Hecho (2026-09-03).** La lógica está en
@@ -240,9 +240,9 @@ así se pudra.
     a ser la del jugador. Sin errores de consola.
 
 - [x] **T04. Marcador y resumen de partida**
-  No hay forma de ver el estado más allá de los dos números de arriba. Falta un
-  panel con `Tab` (rondas ganadas, bajas, precisión) y una pantalla de fin de
-  partida antes de volver al menú.
+      No hay forma de ver el estado más allá de los dos números de arriba. Falta un
+      panel con `Tab` (rondas ganadas, bajas, precisión) y una pantalla de fin de
+      partida antes de volver al menú.
   - Requiere llevar la cuenta de disparos y aciertos por jugador en el servidor.
   - Hecho cuando: el servidor envía las estadísticas en la instantánea, `Tab` las
     muestra, y hay test de que la precisión se calcula sobre disparos realizados.
@@ -271,9 +271,9 @@ así se pudra.
 ## P2 — Profundidad de juego
 
 - [x] **T05. Tercera arma con mira (rifle de precisión)**
-  Dos armas dan poca decisión. Un rifle de un disparo con zoom obliga a elegir
-  entre control del ángulo largo y movilidad, que es la tensión que hace
-  interesante el mapa.
+      Dos armas dan poca decisión. Un rifle de un disparo con zoom obliga a elegir
+      entre control del ángulo largo y movilidad, que es la tensión que hace
+      interesante el mapa.
   - Necesita apuntado: FOV reducido, sensibilidad escalada con el zoom (si no, la
     mira se vuelve inmanejable) y penalización de velocidad al apuntar.
   - Hecho cuando: existe en [weapons.ts](packages/shared/src/weapons.ts) con sus
@@ -303,17 +303,17 @@ así se pudra.
     lleva el FOV de 74° a 28° y cierra la mira, y no hay errores de consola.
 
 - [ ] **T06. Economía por rondas** — ⏸ **EN PAUSA (2026-09-03, decisión de Nicolás).**
-  No la cojas en ninguna iteración automática: está aparcada a propósito, no
-  pendiente. Si un loop llega hasta aquí, saltar a la siguiente sin marcarla.
-  Ganar o perder una ronda no tiene consecuencia en la siguiente. Un dinero simple
-  (recompensa por ronda y por baja, compra en la fase de congelación) crea
-  decisiones entre rondas.
+      No la cojas en ninguna iteración automática: está aparcada a propósito, no
+      pendiente. Si un loop llega hasta aquí, saltar a la siguiente sin marcarla.
+      Ganar o perder una ronda no tiene consecuencia en la siguiente. Un dinero simple
+      (recompensa por ronda y por baja, compra en la fase de congelación) crea
+      decisiones entre rondas.
   - Hecho cuando: la fase `freeze` permite comprar, el dinero se simula en el
     servidor y hay tests de las reglas de recompensa.
 
 - [x] **T07. Segundo mapa**
-  `ATRIUM` es una arena abierta. Un mapa con pasillos y ángulos cerrados prueba
-  que el motor no está atado a un solo diseño, y de paso obligará a mejorar al bot.
+      `ATRIUM` es una arena abierta. Un mapa con pasillos y ángulos cerrados prueba
+      que el motor no está atado a un solo diseño, y de paso obligará a mejorar al bot.
   - La definición ya lo admite sin tocar el motor: ver [map.ts](packages/shared/src/map.ts).
   - Hecho cuando: el mapa pasa los mismos tests que `ATRIUM` (simetría, spawns no
     sólidos, rutas transitables) y se puede elegir al crear la partida.
@@ -342,9 +342,9 @@ así se pudra.
     consola.
 
 - [x] **T08. Avatares animados**
-  Los rivales se deslizan rígidos. Con inclinación al correr y balanceo de piernas
-  derivados de la velocidad interpolada, sin esqueleto ni assets, se lee mucho
-  mejor lo que están haciendo.
+      Los rivales se deslizan rígidos. Con inclinación al correr y balanceo de piernas
+      derivados de la velocidad interpolada, sin esqueleto ni assets, se lee mucho
+      mejor lo que están haciendo.
   - Hecho cuando: el avatar refleja velocidad, dirección y salto en
     [players.ts](apps/client/src/render/players.ts).
   - **Hecho (2026-09-04).** Sin esqueleto ni assets: la pose sale de la velocidad
@@ -368,10 +368,10 @@ así se pudra.
     ve mal desde el perfil que usa el banco; esa parte la cubren los tests.
 
 - [x] **T09. Bot con navegación**
-  El bot persigue en línea recta y rodea cuando detecta que no avanza
-  ([bot.ts](apps/server/src/bot.ts)). Le basta para una arena abierta; con T07 se
-  quedará atascado. Un grafo de puntos de navegación por mapa y búsqueda de camino
-  lo arregla sin complicarlo mucho.
+      El bot persigue en línea recta y rodea cuando detecta que no avanza
+      ([bot.ts](apps/server/src/bot.ts)). Le basta para una arena abierta; con T07 se
+      quedará atascado. Un grafo de puntos de navegación por mapa y búsqueda de camino
+      lo arregla sin complicarlo mucho.
   - Hecho cuando: el bot llega a cualquier punto del mapa desde cualquier otro en
     un test, con un límite de tiempo razonable.
   - **Hecho (2026-09-04).** [navigation.ts](packages/shared/src/navigation.ts)
@@ -403,55 +403,90 @@ así se pudra.
 
 ## P3 — Infraestructura y sostenibilidad
 
-- [ ] **T10. ESLint + Prettier**
-  No hay linter. El estilo hoy es consistente porque se escribió de una vez; en
-  cuanto se toque desde varias sesiones dejará de serlo.
+- [x] **T10. ESLint + Prettier**
+      No hay linter. El estilo hoy es consistente porque se escribió de una vez; en
+      cuanto se toque desde varias sesiones dejará de serlo.
   - Reglas mínimas: `@typescript-eslint` estricto, prohibir `any` implícito y
     exportaciones sin uso, formato con Prettier.
   - Hecho cuando: `npm run lint` está en verde, entra en `npm run check` y en CI.
+  - **Hecho (2026-09-05).** `npm run lint` son tres pasos: ESLint con
+    `strictTypeChecked` (reglas con tipos), Prettier en modo comprobación y knip.
+    Entra en `npm run check` y en CI, antes de los tests. Las reglas con tipos
+    necesitan un programa que abarque también los tests y las configuraciones, que
+    el build no compila: eso es `tsconfig.lint.json`, y solo lo usa el linter.
+  - **Desviación: las exportaciones sin uso no las puede ver ESLint.** Una regla
+    de ESLint mira un fichero cada vez, así que caza variables e imports muertos
+    pero no una exportación que no importa nadie. Para eso está knip, que además
+    encuentra ficheros enteros sin usar. Con él salieron tres exportaciones que
+    no leía nadie (`DEFAULT_BINDINGS`, `movementButtons`, `runTicks`) y dos
+    constantes muertas en `map.ts` (`MAX_STAIR_RISE` y `stairFitsStepSize`, que
+    decían ser "invariantes usados por los tests" y no los usaba ningún test: el
+    invariante es ahora un test de verdad).
+  - **Dos reglas del preajuste estricto están ajustadas**, con el motivo escrito
+    en `eslint.config.js`: `no-non-null-assertion` desactivada, porque con
+    `noUncheckedIndexedAccess` el `!` es la contrapartida obligada de esa
+    elección y había 162 usos legítimos; y `restrict-template-expressions` con
+    `allowNumber`, que es justo lo que quieren los logs y el HUD.
+  - **Los 260 errores iniciales no eran todos ruido.** Lo que se arregló de
+    verdad: `(object as Mesh).material` mentía sobre el tipo y hacía imposible
+    saber si el objeto tenía material; las tres rutinas de liberar GPU casi
+    idénticas (avatar, arma y mapa) son ahora una, `render/dispose.ts`, que
+    además documenta por qué `instanceof Mesh` estrecha a `Mesh<any, any>`;
+    `byId<HTMLInputElement>(...)` era un `as` sin verificar, y ahora `byIdOf`
+    comprueba la clase de verdad al arrancar; `parseServerMessage` decía tener
+    un `ServerMessage` antes de haberlo validado; y el servidor decodificaba los
+    mensajes de `ws` con un `raw.toString()` que sobre una lista de Buffers
+    habría devuelto `[object Object]`.
+  - Prettier formatea también el Markdown (`proseWrap` por defecto: no reflowea
+    la prosa, solo alinea tablas y normaliza el énfasis), así que este archivo y
+    el README cambian de forma en el mismo commit.
+  - Verificado en Chrome real, porque el cambio toca al cliente: arranque, entrar
+    a una partida contra el bot, las cuatro armas por sus teclas, correr, el
+    marcador con Tab, salir de la partida (que es donde se libera la malla del
+    mapa) y volver a entrar. Sin un solo error de consola.
 
 - [ ] **T11. El servidor mide la latencia**
-  Hoy el cliente declara su `rtt` y el servidor lo usa para rebobinar. Está acotado
-  a 200 ms, así que el abuso posible es pequeño, pero medirlo en el servidor a
-  partir del retraso de los comandos recibidos elimina el problema de raíz.
+      Hoy el cliente declara su `rtt` y el servidor lo usa para rebobinar. Está acotado
+      a 200 ms, así que el abuso posible es pequeño, pero medirlo en el servidor a
+      partir del retraso de los comandos recibidos elimina el problema de raíz.
   - Hecho cuando: `computeRewindTime` usa una latencia estimada por el servidor y
     hay test de que un cliente que miente no consigue más rebobinado.
 
 - [ ] **T12. Reconexión**
-  Si se cae el socket se pierde la partida. Guardar la sesión unos segundos con un
-  identificador permitiría volver a la ronda en curso.
+      Si se cae el socket se pierde la partida. Guardar la sesión unos segundos con un
+      identificador permitiría volver a la ronda en curso.
   - Hecho cuando: un cliente que se reconecta con su identificador recupera su
     jugador, y hay test de que la sesión expira si no vuelve.
 
 - [ ] **T13. Instantáneas delta**
-  Se envía el estado completo 64 veces por segundo. Con dos jugadores son ~15 KB/s
-  y no molesta, pero mandar solo lo que cambia (o bajar a 32 Hz apoyándose en la
-  interpolación) es la mitad del tráfico casi gratis.
+      Se envía el estado completo 64 veces por segundo. Con dos jugadores son ~15 KB/s
+      y no molesta, pero mandar solo lo que cambia (o bajar a 32 Hz apoyándose en la
+      interpolación) es la mitad del tráfico casi gratis.
   - Medir antes y después: sin número no es una optimización, es una corazonada.
   - Hecho cuando: el cliente reconstruye el estado a partir de deltas y hay test de
     que una secuencia con deltas produce el mismo estado que una completa.
 
 - [ ] **T14. Ajustes de mira y teclas**
-  Los enlaces de teclado están en el código
-  ([input.ts](apps/client/src/game/input.ts)) y la mira no se puede configurar.
-  Ambas cosas son de las primeras que toca cualquiera que juegue en serio.
+      Los enlaces de teclado están en el código
+      ([input.ts](apps/client/src/game/input.ts)) y la mira no se puede configurar.
+      Ambas cosas son de las primeras que toca cualquiera que juegue en serio.
   - Hecho cuando: se pueden reasignar teclas y ajustar color, grosor y modo
     (estática o dinámica) de la mira, todo persistido con el resto de ajustes.
 
 - [ ] **T15. Docker y observabilidad** — la imagen ya está (2026-09-04); falta la
-  observabilidad.
-  `Dockerfile`, `compose.yaml` y [DEPLOY.md](DEPLOY.md) construyen la imagen en
-  x86_64 y en ARM64 y la dejan lista para servir detrás de un túnel o un proxy.
-  Lo que sigue pendiente son las métricas: `/health` solo informa de las sesiones
-  vivas y de la versión del protocolo, y el tick que anuncia el `welcome` es el
-  teórico, no el que el bucle consigue de verdad.
+      observabilidad.
+      `Dockerfile`, `compose.yaml` y [DEPLOY.md](DEPLOY.md) construyen la imagen en
+      x86_64 y en ARM64 y la dejan lista para servir detrás de un túnel o un proxy.
+      Lo que sigue pendiente son las métricas: `/health` solo informa de las sesiones
+      vivas y de la versión del protocolo, y el tick que anuncia el `welcome` es el
+      teórico, no el que el bucle consigue de verdad.
   - Hecho cuando: `/health` informa del tick real medido, de los jugadores
     conectados y de las partidas activas.
 
 - [ ] **T16. Rendimiento del render**
-  Cada brush es una malla ([world.ts](apps/client/src/render/world.ts)). Con ~70
-  va sobrado, pero un mapa mayor pediría fusionar la geometría estática por
-  material. Medir primero con las herramientas del navegador.
+      Cada brush es una malla ([world.ts](apps/client/src/render/world.ts)). Con ~70
+      va sobrado, pero un mapa mayor pediría fusionar la geometría estática por
+      material. Medir primero con las herramientas del navegador.
   - Hecho cuando: hay una medida antes y después en un mapa grande de prueba.
 
 ---
@@ -462,18 +497,18 @@ Los pidió Nicolás el 2026-09-04 jugando, no salieron de este backlog. Se anota
 aquí porque dos de ellos cambiaron reglas del juego, no solo código.
 
 - [x] **B01. Una tecla por arma, sin ciclo**
-  `Digit2` estaba enlazada al mismo botón que `Q` y ese botón *rotaba* de arma,
-  así que una pulsación larga o la repetición del teclado encadenaba cambios y se
-  acababa con un arma que nadie había pedido.
+      `Digit2` estaba enlazada al mismo botón que `Q` y ese botón _rotaba_ de arma,
+      así que una pulsación larga o la repetición del teclado encadenaba cambios y se
+      acababa con un arma que nadie había pedido.
   - El botón `SWITCH` desaparece del comando. En su lugar viaja un campo `slot`
-    (1-4) que dice *qué* arma se quiere, no "cambia": pedir la que ya se lleva no
+    (1-4) que dice _qué_ arma se quiere, no "cambia": pedir la que ya se lleva no
     hace nada, así que mantener la tecla es inofensivo por construcción y no hay
     que detectar el flanco de la pulsación.
   - `1` rifle, `2` pistola, `3` cuchillo, `4` sniper. `PROTOCOL_VERSION` sube a 2:
     un cliente viejo en caché no podría cambiar de arma, y es mejor que lo rechace.
 
 - [x] **B02. La cámara temblaba al moverse agachado**
-  Dos causas encadenadas, las dos arregladas:
+      Dos causas encadenadas, las dos arregladas:
   - Al quedarse sin comandos (los huecos son constantes con el jitter normal), el
     servidor repetía el último con `buttons: 0`, o sea **levantaba** a un jugador
     que seguía agachado en su pantalla. La velocidad máxima simulada saltaba de 73
@@ -484,14 +519,14 @@ aquí porque dos de ellos cambiaron reglas del juego, no solo código.
     bajada movía la cámara 18 unidades de golpe. Ahora se envía el progreso.
 
 - [x] **B03. Cuchillo en la tecla 3**
-  SPLICE: cuerpo a cuerpo, ×1,16 de velocidad (lo más rápido del juego), 76
-  unidades de alcance, dos tajos al cuerpo o uno a la cabeza. La sniper pasa al
-  `4`. No gasta munición ni se recarga: `WeaponDef.melee` decide eso, el clic en
-  vacío y el `∞` del HUD.
+      SPLICE: cuerpo a cuerpo, ×1,16 de velocidad (lo más rápido del juego), 76
+      unidades de alcance, dos tajos al cuerpo o uno a la cabeza. La sniper pasa al
+      `4`. No gasta munición ni se recarga: `WeaponDef.melee` decide eso, el clic en
+      vacío y el `∞` del HUD.
 
 - [x] **B04. Bunnyhop con aviso sonoro**
   - **Bug latente que salió por el camino:** el evento `landed` no se emitía
-    *nunca*. Se decidía antes de mover al jugador en ese tick, así que cayendo
+    _nunca_. Se decidía antes de mover al jugador en ese tick, así que cayendo
     siempre lo veía todavía en el aire. Por eso no sonaba el golpe al aterrizar ni
     se aplicaba la penalización por caída fuerte. Ahora se decide después del
     último `categorizePosition`, que es el que ve el contacto de verdad.
@@ -500,7 +535,7 @@ aquí porque dos de ellos cambiaron reglas del juego, no solo código.
     el suelo no aplica fricción, y **eso es lo que hace jugable la mecánica**: con
     fricción, dos ticks se comen lo ganado en el aire y solo valdría el salto en
     el tick exacto del contacto (15 ms), imposible de acertar de oído.
-  - Techo relativo al arma (×1,7 de *su* carrera): 306 con la sniper, 365 con el
+  - Techo relativo al arma (×1,7 de _su_ carrera): 306 con la sniper, 365 con el
     rifle, 441 con el cuchillo. Con un techo absoluto, el bhop borraría los
     multiplicadores de velocidad de las armas.
   - Aviso: un clic agudo 130 ms antes del aterrizaje previsto (`timeToLanding`,
@@ -538,8 +573,8 @@ cambiarlas, que sea a propósito y no por descuido:
   decorativa y la única forma de encadenar sería acertar el tick exacto del
   contacto. Ver B04.
 - **El comando que el servidor se inventa conserva la postura.** Cuando el buffer
-  de entrada se queda vacío se repite el último comando sin *acciones* (disparar,
-  moverse, saltar) pero con la *postura* (agachado, andando, apuntando). Borrarla
+  de entrada se queda vacío se repite el último comando sin _acciones_ (disparar,
+  moverse, saltar) pero con la _postura_ (agachado, andando, apuntando). Borrarla
   entera separaba las dos simulaciones varias veces por segundo. Ver B02.
 - **La simulación no consulta el reloj.** Todo avanza por pasos explícitos. Es lo
   que permite simular una partida entera en milisegundos en los tests; cualquier

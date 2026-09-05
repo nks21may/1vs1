@@ -22,6 +22,8 @@ import {
 } from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
+import { disposeObject } from './dispose.js';
+
 import type { Brush, GameMap } from '@neonduel/shared';
 
 import { PALETTE, createGridTexture } from './scene.js';
@@ -182,7 +184,9 @@ export const buildWorldMesh = (map: GameMap): Group => {
     const geometries = edgesBySide[side];
     if (geometries.length === 0) continue;
 
-    const merged = mergeGeometries(geometries, false);
+    // Los tipos prometen una geometria siempre, pero `mergeGeometries` devuelve
+    // `null` si los atributos de las piezas no encajan.
+    const merged = mergeGeometries(geometries, false) as BufferGeometry | null;
     for (const geometry of geometries) geometry.dispose();
     if (!merged) continue;
 
@@ -206,13 +210,4 @@ export const buildWorldMesh = (map: GameMap): Group => {
  * Libera la malla de un mapa. Cambiar de mapa entre partidas sin esto va
  * dejando geometrias y materiales en la GPU que ya no dibuja nadie.
  */
-export const disposeWorldMesh = (group: Group): void => {
-  group.traverse((object) => {
-    const conGeometria = object as { geometry?: { dispose(): void }; material?: unknown };
-    conGeometria.geometry?.dispose();
-    const material = conGeometria.material;
-    for (const m of Array.isArray(material) ? material : [material]) {
-      (m as { dispose?: () => void } | undefined)?.dispose?.();
-    }
-  });
-};
+export const disposeWorldMesh = disposeObject;

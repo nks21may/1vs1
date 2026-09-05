@@ -67,7 +67,11 @@ export const sanitizeSettings = (raw: unknown): Settings => {
   };
 };
 
-export const loadSettings = (storage: Storage | undefined = globalThis.localStorage): Settings => {
+/** En un entorno sin DOM (los tests en Node, o el modo quiosco) no existe. */
+const defaultStorage = (): Storage | undefined =>
+  (globalThis as { localStorage?: Storage }).localStorage;
+
+export const loadSettings = (storage: Storage | undefined = defaultStorage()): Settings => {
   try {
     const raw = storage?.getItem(STORAGE_KEY);
     return sanitizeSettings(raw ? JSON.parse(raw) : null);
@@ -79,7 +83,7 @@ export const loadSettings = (storage: Storage | undefined = globalThis.localStor
 
 export const saveSettings = (
   settings: Settings,
-  storage: Storage | undefined = globalThis.localStorage,
+  storage: Storage | undefined = defaultStorage(),
 ): void => {
   try {
     storage?.setItem(STORAGE_KEY, JSON.stringify(sanitizeSettings(settings)));

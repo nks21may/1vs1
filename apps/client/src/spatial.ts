@@ -19,10 +19,7 @@ export const toAudioCoords = (v: Vec3): Vec3 => vec3(v.x, v.z, -v.y);
  * Vectores de orientacion del oyente a partir de los angulos de vista, ya en
  * coordenadas de audio y listos para `AudioListener`.
  */
-export const listenerVectors = (
-  yawDeg: number,
-  pitchDeg: number,
-): { forward: Vec3; up: Vec3 } => {
+export const listenerVectors = (yawDeg: number, pitchDeg: number): { forward: Vec3; up: Vec3 } => {
   const { forward, up } = angleVectors(yawDeg, pitchDeg);
   return { forward: toAudioCoords(forward), up: toAudioCoords(up) };
 };

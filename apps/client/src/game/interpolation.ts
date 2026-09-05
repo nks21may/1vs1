@@ -116,13 +116,8 @@ export class InterpolationBuffer {
     return this.playersOf(newest, excludeId);
   }
 
-  private playersOf(
-    snapshot: TimedSnapshot,
-    excludeId?: number,
-  ): InterpolatedPlayer[] {
-    return snapshot.players
-      .filter((p) => p.id !== excludeId)
-      .map((p) => toInterpolated(p));
+  private playersOf(snapshot: TimedSnapshot, excludeId?: number): InterpolatedPlayer[] {
+    return snapshot.players.filter((p) => p.id !== excludeId).map((p) => toInterpolated(p));
   }
 
   private interpolate(
@@ -139,11 +134,7 @@ export class InterpolationBuffer {
 
         return toInterpolated(from, {
           pos: vec3(lerp(from.x, to.x, t), lerp(from.y, to.y, t), lerp(from.z, to.z, t)),
-          vel: vec3(
-            lerp(from.vx, to.vx, t),
-            lerp(from.vy, to.vy, t),
-            lerp(from.vz, to.vz, t),
-          ),
+          vel: vec3(lerp(from.vx, to.vx, t), lerp(from.vy, to.vy, t), lerp(from.vz, to.vz, t)),
           // Los angulos se interpolan por el camino corto: si no, girar 180
           // grados haria que el modelo diese una vuelta entera al reves.
           yaw: lerpAngle(from.yaw, to.yaw, t),

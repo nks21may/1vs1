@@ -284,15 +284,14 @@ export const sanitizeName = (name: string): string => {
 /** Redondeo a dos decimales: recorta el tamano del snapshot sin artefactos visibles. */
 export const round2 = (value: number): number => Math.round(value * 100) / 100;
 
-export const encodeServerMessage = (message: ServerMessage): string =>
-  JSON.stringify(message);
+export const encodeServerMessage = (message: ServerMessage): string => JSON.stringify(message);
 
 export const parseServerMessage = (raw: string): ServerMessage | null => {
   try {
-    const data = JSON.parse(raw) as ServerMessage;
+    const data: unknown = JSON.parse(raw);
     if (typeof data !== 'object' || data === null) return null;
     if (typeof (data as { t?: unknown }).t !== 'string') return null;
-    return data;
+    return data as ServerMessage;
   } catch {
     return null;
   }

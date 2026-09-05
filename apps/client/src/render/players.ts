@@ -21,14 +21,11 @@ import {
   Object3D,
 } from 'three';
 
-import {
-  PLAYER_HEIGHT_DUCKED,
-  PLAYER_HEIGHT_STANDING,
-  clamp,
-} from '@neonduel/shared';
+import { PLAYER_HEIGHT_DUCKED, PLAYER_HEIGHT_STANDING, clamp } from '@neonduel/shared';
 
 import type { InterpolatedPlayer } from '../game/interpolation.js';
 import { avatarPose } from './avatar-pose.js';
+import { disposeObject, drawableOf } from './dispose.js';
 import { PALETTE, applyViewAngles } from './scene.js';
 
 const DUCK_SCALE = PLAYER_HEIGHT_DUCKED / PLAYER_HEIGHT_STANDING;
@@ -97,10 +94,7 @@ export class PlayerAvatar {
     this.head.position.y = 64;
 
     // Visor: la unica superficie realmente brillante, marca hacia donde mira.
-    const visor = new Mesh(
-      new BoxGeometry(12, 4, 1),
-      new MeshBasicMaterial({ color: this.color }),
-    );
+    const visor = new Mesh(new BoxGeometry(12, 4, 1), new MeshBasicMaterial({ color: this.color }));
     visor.position.set(0, 1, -8.5);
     this.head.add(visor);
 
@@ -159,24 +153,17 @@ export class PlayerAvatar {
 
   private setOpacity(opacity: number): void {
     this.body.traverse((object: Object3D) => {
-      const material = (object as Mesh).material;
+      const material = drawableOf(object)?.material;
+      // Los materiales compartidos por varias partes llegan en lista; el avatar
+      // no usa ninguno, asi que ahi no hay nada que atenuar.
       if (!material || Array.isArray(material)) return;
-      if ('opacity' in material) {
-        material.transparent = opacity < 1;
-        material.opacity = opacity;
-      }
+      material.transparent = opacity < 1;
+      material.opacity = opacity;
     });
   }
 
   dispose(): void {
-    this.root.traverse((object) => {
-      if (object instanceof Mesh || object instanceof LineSegments) {
-        object.geometry.dispose();
-        const material = object.material;
-        if (Array.isArray(material)) material.forEach((m) => m.dispose());
-        else material.dispose();
-      }
-    });
+    disposeObject(this.root);
   }
 }
 

@@ -305,11 +305,7 @@ export class MatchSession {
    * veia en su pantalla.
    */
   private resolveShot(participant: Participant, shot: ShotRequest): void {
-    const rewindTime = computeRewindTime(
-      this.timeMs,
-      participant.latencyMs,
-      participant.interpMs,
-    );
+    const rewindTime = computeRewindTime(this.timeMs, participant.latencyMs, participant.interpMs);
     // El historial solo llega hasta el tick anterior. Si no hay nada que
     // compensar (cliente local, o latencia declarada nula) se dispara contra el
     // estado presente en lugar de arrastrar un tick de desfase artificial.
@@ -484,9 +480,7 @@ export class MatchSession {
       weapon: player.weapon,
       ammo: player.ammo[player.weapon],
       reload:
-        player.reloadRemaining > 0
-          ? round2(1 - player.reloadRemaining / weapon.reloadTime)
-          : 0,
+        player.reloadRemaining > 0 ? round2(1 - player.reloadRemaining / weapon.reloadTime) : 0,
       score: this.match.scoreOf(player.id),
       stats: { ...this.statsOf(player.id) },
     };
@@ -511,9 +505,7 @@ export class MatchSession {
 
       participant.connection.send({
         t: 'snapshot',
-        ...(participant.pendingViewYaw === null
-          ? {}
-          : { viewYaw: participant.pendingViewYaw }),
+        ...(participant.pendingViewYaw === null ? {} : { viewYaw: participant.pendingViewYaw }),
         tick: this.tick,
         time: round2(this.timeMs),
         ack: participant.lastProcessedSeq,

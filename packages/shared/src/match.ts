@@ -15,13 +15,7 @@ import {
   WARMUP_SECONDS,
 } from './constants.js';
 
-export type MatchPhase =
-  | 'waiting'
-  | 'warmup'
-  | 'freeze'
-  | 'live'
-  | 'roundEnd'
-  | 'matchEnd';
+export type MatchPhase = 'waiting' | 'warmup' | 'freeze' | 'live' | 'roundEnd' | 'matchEnd';
 
 export type MatchEvent =
   | { type: 'phase'; phase: MatchPhase }
@@ -159,9 +153,7 @@ export class MatchState {
       this.scores.set(winnerId, this.scoreOf(winnerId) + 1);
     }
 
-    const events: MatchEvent[] = [
-      { type: 'roundEnd', round: this.round, winnerId, reason },
-    ];
+    const events: MatchEvent[] = [{ type: 'roundEnd', round: this.round, winnerId, reason }];
 
     if (winnerId !== null && this.scoreOf(winnerId) >= this.config.roundsToWin) {
       this.matchWinner = winnerId;
@@ -198,5 +190,4 @@ export class MatchState {
  * algo: fallar contra una pared cuenta, que es justo lo que hace que el numero
  * signifique algo. Sin disparos la punteria es 0 y no una division por cero.
  */
-export const accuracy = (hits: number, shots: number): number =>
-  shots > 0 ? hits / shots : 0;
+export const accuracy = (hits: number, shots: number): number => (shots > 0 ? hits / shots : 0);

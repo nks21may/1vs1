@@ -56,8 +56,7 @@ const cmd = (seq: number, buttons = 0, yaw = 0, pitch = 0): UserCommand => ({
   dt: TICK_DT,
 });
 
-const input = (cmds: UserCommand[]) =>
-  ({ t: 'input', cmds, interp: 0, rtt: 0 }) as const;
+const input = (cmds: UserCommand[]) => ({ t: 'input', cmds, interp: 0, rtt: 0 }) as const;
 
 describe('conexion a la partida', () => {
   it('envia la bienvenida con el identificador asignado', () => {
@@ -270,7 +269,6 @@ describe('disparos', () => {
     // con inclinar la vista hacia arriba la diferencia entre ojos y coronilla.
     const dz = PLAYER_HEIGHT_STANDING - 6 - 64;
     const pitch = -(Math.atan2(dz, 300) * 180) / Math.PI;
-    void target;
     shooter.pitch = pitch;
 
     session.handleMessage(1, input([cmd(1, BUTTON.ATTACK, 0, pitch)]));
@@ -490,16 +488,22 @@ describe('angulo de vista al reaparecer', () => {
     const { session, a, b } = newSession();
     ticks(session, 1);
 
-    expect(a.all('snapshot')[0]!.viewYaw).toBe(ATRIUM.spawns[0]!.yaw);
-    expect(b.all('snapshot')[0]!.viewYaw).toBe(ATRIUM.spawns[1]!.yaw);
+    expect(a.all('snapshot')[0]!.viewYaw).toBe(ATRIUM.spawns[0].yaw);
+    expect(b.all('snapshot')[0]!.viewYaw).toBe(ATRIUM.spawns[1].yaw);
   });
 
   it('al cambiar de lado cada cliente recibe el angulo de su nuevo spawn', () => {
     const { session, a, b } = newSession();
     goLive(session);
 
-    const yawA = a.all('snapshot').filter((s) => s.viewYaw !== undefined).at(-1)!.viewYaw;
-    const yawB = b.all('snapshot').filter((s) => s.viewYaw !== undefined).at(-1)!.viewYaw;
+    const yawA = a
+      .all('snapshot')
+      .filter((s) => s.viewYaw !== undefined)
+      .at(-1)!.viewYaw;
+    const yawB = b
+      .all('snapshot')
+      .filter((s) => s.viewYaw !== undefined)
+      .at(-1)!.viewYaw;
 
     // Los dos han cambiado de lado, asi que miran en sentidos opuestos.
     expect(yawA).not.toBe(yawB);
@@ -524,7 +528,7 @@ describe('angulo de vista al reaparecer', () => {
 
   it('el angulo pedido corresponde al spawn actual aunque el cliente mande el viejo', () => {
     const { session, a } = newSession();
-    const inicial = ATRIUM.spawns[0]!.yaw;
+    const inicial = ATRIUM.spawns[0].yaw;
     goLive(session);
 
     // El cliente aun no se ha enterado del cambio de lado y sigue mandando el
@@ -534,7 +538,10 @@ describe('angulo de vista al reaparecer', () => {
 
     const me = a.last('snapshot')!.players.find((p) => p.id === 1)!;
     const spawnActual = ATRIUM.spawns.find((s) => Math.abs(s.pos.x - me.x) < 1)!;
-    const pedido = a.all('snapshot').filter((s) => s.viewYaw !== undefined).at(-1)!.viewYaw;
+    const pedido = a
+      .all('snapshot')
+      .filter((s) => s.viewYaw !== undefined)
+      .at(-1)!.viewYaw;
 
     expect(pedido).toBe(spawnActual.yaw);
   });
@@ -565,7 +572,12 @@ describe('pasos audibles', () => {
    * Corre `count` ticks con el mismo comando y devuelve en que ticks ha sonado
    * un paso del jugador 1.
    */
-  const stepTicks = (session: MatchSession, a: MemoryConnection, buttons: number, count: number) => {
+  const stepTicks = (
+    session: MatchSession,
+    a: MemoryConnection,
+    buttons: number,
+    count: number,
+  ) => {
     const heard: number[] = [];
     // Con el angulo del spawn: corriendo hacia otro lado se choca con la pared
     // del fondo y no se llega ni a la velocidad de andar.

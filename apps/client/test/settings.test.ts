@@ -19,7 +19,7 @@ const memoryStorage = (initial: Record<string, string> = {}): Storage => {
     key: (index) => [...data.keys()][index] ?? null,
     removeItem: (key) => void data.delete(key),
     setItem: (key, value) => void data.set(key, value),
-  } as Storage;
+  };
 };
 
 /** Almacenamiento que falla siempre, como en modo privado. */

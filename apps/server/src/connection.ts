@@ -40,9 +40,7 @@ export class MemoryConnection implements Connection {
   }
 
   /** Ultimo mensaje de un tipo concreto, o undefined. */
-  last<T extends ServerMessage['t']>(
-    type: T,
-  ): Extract<ServerMessage, { t: T }> | undefined {
+  last<T extends ServerMessage['t']>(type: T): Extract<ServerMessage, { t: T }> | undefined {
     for (let i = this.sent.length - 1; i >= 0; i--) {
       const message = this.sent[i]!;
       if (message.t === type) return message as Extract<ServerMessage, { t: T }>;
@@ -52,9 +50,6 @@ export class MemoryConnection implements Connection {
 
   /** Todos los mensajes de un tipo. */
   all<T extends ServerMessage['t']>(type: T): Extract<ServerMessage, { t: T }>[] {
-    return this.sent.filter((m) => m.t === type) as Extract<
-      ServerMessage,
-      { t: T }
-    >[];
+    return this.sent.filter((m) => m.t === type) as Extract<ServerMessage, { t: T }>[];
   }
 }

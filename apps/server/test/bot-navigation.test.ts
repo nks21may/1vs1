@@ -18,7 +18,6 @@ import {
   createPlayer,
   navGraphOf,
   simulatePlayerTick,
-  vec3,
 } from '@neonduel/shared';
 
 import { BOT_DIFFICULTIES, BotController } from '../src/bot.js';
@@ -52,13 +51,7 @@ describe.each(Object.entries(MAPS))('el bot recorre %s', (_nombre, mapa) => {
   const extremos = (): Vec3[] => {
     const por = (f: (n: Vec3) => number) =>
       nodos.reduce((mejor, n) => (f(n) > f(mejor) ? n : mejor), nodos[0]!);
-    return [
-      por((n) => n.x),
-      por((n) => -n.x),
-      por((n) => n.y),
-      por((n) => -n.y),
-      por((n) => n.z),
-    ];
+    return [por((n) => n.x), por((n) => -n.x), por((n) => n.y), por((n) => -n.y), por((n) => n.z)];
   };
 
   it('va de un spawn al otro', () => {

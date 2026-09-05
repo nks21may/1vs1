@@ -31,6 +31,13 @@ afterAll(async () => {
   await server.stop();
 });
 
+/** `ws` entrega Buffer, ArrayBuffer o lista de Buffers, nunca texto. */
+const textOf = (raw: WebSocket.RawData): string => {
+  if (Buffer.isBuffer(raw)) return raw.toString('utf8');
+  if (Array.isArray(raw)) return Buffer.concat(raw).toString('utf8');
+  return Buffer.from(raw).toString('utf8');
+};
+
 /** Cliente de pruebas: acumula lo recibido y expone esperas por tipo. */
 class TestClient {
   readonly messages: ServerMessage[] = [];
@@ -40,7 +47,7 @@ class TestClient {
   constructor(query = '') {
     this.socket = new WebSocket(`ws://127.0.0.1:${server.port}/${query}`);
     this.socket.on('message', (data) => {
-      this.messages.push(JSON.parse(data.toString('utf8')) as ServerMessage);
+      this.messages.push(JSON.parse(textOf(data)) as ServerMessage);
     });
   }
 
@@ -87,7 +94,7 @@ class TestClient {
       }, timeoutMs);
 
       const onMessage = (data: WebSocket.RawData): void => {
-        const message = JSON.parse(data.toString('utf8')) as ServerMessage;
+        const message = JSON.parse(textOf(data)) as ServerMessage;
         if (message.t !== type) return;
         clearTimeout(timer);
         this.socket.off('message', onMessage);
@@ -111,8 +118,7 @@ class TestClient {
 
   get closed(): boolean {
     return (
-      this.socket.readyState === WebSocket.CLOSED ||
-      this.socket.readyState === WebSocket.CLOSING
+      this.socket.readyState === WebSocket.CLOSED || this.socket.readyState === WebSocket.CLOSING
     );
   }
 
@@ -140,9 +146,7 @@ describe('HTTP', () => {
   });
 
   it('no deja salir del directorio del cliente', async () => {
-    const response = await fetch(
-      `http://127.0.0.1:${server.port}/../../../package.json`,
-    );
+    const response = await fetch(`http://127.0.0.1:${server.port}/../../../package.json`);
     // El navegador normaliza la ruta; en cualquier caso nunca debe servir el archivo.
     expect(response.status).toBeGreaterThanOrEqual(400);
   });

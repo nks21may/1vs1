@@ -25,6 +25,7 @@ un duelo real, **Buscar rival** en dos pestañas o dos equipos.
 - [El movimiento](#el-movimiento)
 - [Los mapas](#los-mapas)
 - [Comandos](#comandos)
+- [Estilo y linter](#estilo-y-linter)
 - [Tests](#tests)
 - [Despliegue](#despliegue)
 
@@ -32,27 +33,27 @@ un duelo real, **Buscar rival** en dos pestañas o dos equipos.
 
 ## Cómo se juega
 
-| Tecla | Acción |
-|---|---|
-| `W` `A` `S` `D` | Moverse |
-| `Espacio` | Saltar |
-| `Ctrl` / `C` | Agacharse |
-| `Shift` | Andar en silencio (más lento, más preciso) |
+| Tecla           | Acción                                       |
+| --------------- | -------------------------------------------- |
+| `W` `A` `S` `D` | Moverse                                      |
+| `Espacio`       | Saltar                                       |
+| `Ctrl` / `C`    | Agacharse                                    |
+| `Shift`         | Andar en silencio (más lento, más preciso)   |
 | `1` `2` `3` `4` | Rifle, pistola, cuchillo, rifle de precisión |
-| `R` | Recargar |
-| Clic izquierdo | Disparar |
-| Clic derecho | Apuntar (solo el arma con mira) |
-| `Esc` | Liberar el ratón |
+| `R`             | Recargar                                     |
+| Clic izquierdo  | Disparar                                     |
+| Clic derecho    | Apuntar (solo el arma con mira)              |
+| `Esc`           | Liberar el ratón                             |
 
-Cada arma tiene su propia tecla y siempre la misma: pulsar un número lleva a *esa*
+Cada arma tiene su propia tecla y siempre la misma: pulsar un número lleva a _esa_
 arma, no a la siguiente de una lista.
 
-| Ranura | Arma | Qué aporta | Qué cuesta |
-|---|---|---|---|
-| `1` | VEKTOR-9 (rifle) | Automática, patrón memorizable | ×0,86 de velocidad |
-| `2` | AXIOM (pistola) | Velocidad de carrera intacta | 26 de daño por bala |
-| `3` | SPLICE (cuchillo) | ×1,16 de velocidad: el arma de moverse | Alcance de 76 unidades |
-| `4` | LONGWAVE (sniper) | Mata de un tiro al cuerpo, con mira | ×0,72 y un segundo entre tiros |
+| Ranura | Arma              | Qué aporta                             | Qué cuesta                     |
+| ------ | ----------------- | -------------------------------------- | ------------------------------ |
+| `1`    | VEKTOR-9 (rifle)  | Automática, patrón memorizable         | ×0,86 de velocidad             |
+| `2`    | AXIOM (pistola)   | Velocidad de carrera intacta           | 26 de daño por bala            |
+| `3`    | SPLICE (cuchillo) | ×1,16 de velocidad: el arma de moverse | Alcance de 76 unidades         |
+| `4`    | LONGWAVE (sniper) | Mata de un tiro al cuerpo, con mira    | ×0,72 y un segundo entre tiros |
 
 Reglas: partidas al mejor de 15 (primero a 8 rondas), sin reaparición dentro de la
 ronda, 90 segundos por ronda y cambio de lado en cada una.
@@ -61,14 +62,14 @@ Cuatro cosas que conviene saber antes del primer duelo:
 
 1. **Moverse arruina la puntería.** La dispersión crece con el cuadrado de la
    velocidad. Hay que frenar antes de disparar, y la forma rápida de frenar es
-   pulsar la dirección contraria (*counter-strafe*): la fricción del suelo es
+   pulsar la dirección contraria (_counter-strafe_): la fricción del suelo es
    constante por debajo de 80 u/s, así que el jugador se detiene casi en seco.
 2. **La primera bala es exacta.** A partir de la segunda entra el patrón de
    retroceso, que es fijo y se puede memorizar: sube, tira a la izquierda y luego
    vuelve a la derecha. La mira solo acompaña una fracción de esa subida, así que
    compensar con el ratón es cosa tuya.
 3. **En el aire no se acierta**, pero sí se gana velocidad: girando la vista hacia
-   el lado que estás pulsando se supera el límite de carrera (*air-strafing*).
+   el lado que estás pulsando se supera el límite de carrera (_air-strafing_).
 4. **El bunnyhop se encadena de oído.** Un clic agudo suena 130 ms antes de tocar
    suelo: saltar al oírlo conserva la velocidad ganada en el aire y la cadena
    sigue. Llegar tarde deja que la fricción se la coma. Un tono ascendente
@@ -146,7 +147,7 @@ aparecían mirando fuera del mapa.
 (rechaza `NaN`, `dt` inflados, secuencias repetidas y bits de botón inventados),
 limita cuántos comandos procesa por tick para que recuperar un retraso no se
 convierta en correr más rápido, y aplica un presupuesto de mensajes por segundo.
-El cliente decide *qué teclas pulsa*; nada más.
+El cliente decide _qué teclas pulsa_; nada más.
 
 ---
 
@@ -154,20 +155,20 @@ El cliente decide *qué teclas pulsa*; nada más.
 
 Constantes copiadas de Source, porque son las que producen esa sensación:
 
-| Parámetro | Valor |
-|---|---|
-| Tick | 64 Hz |
-| Gravedad | 800 u/s² |
-| Velocidad máxima | 250 u/s (×0,86 con rifle) |
-| Aceleración / en el aire | 5,5 / 12 |
-| Tope de `wishspeed` aéreo | 30 u/s |
-| Fricción / velocidad de parada | 5,2 / 80 u/s |
-| Impulso de salto | 301,993 u/s (57 unidades de altura) |
-| Escalón máximo | 18 unidades |
-| Ventana de bunnyhop | 150 ms desde el aterrizaje |
-| Techo encadenando | ×1,7 de la carrera del arma equipada |
+| Parámetro                      | Valor                                |
+| ------------------------------ | ------------------------------------ |
+| Tick                           | 64 Hz                                |
+| Gravedad                       | 800 u/s²                             |
+| Velocidad máxima               | 250 u/s (×0,86 con rifle)            |
+| Aceleración / en el aire       | 5,5 / 12                             |
+| Tope de `wishspeed` aéreo      | 30 u/s                               |
+| Fricción / velocidad de parada | 5,2 / 80 u/s                         |
+| Impulso de salto               | 301,993 u/s (57 unidades de altura)  |
+| Escalón máximo                 | 18 unidades                          |
+| Ventana de bunnyhop            | 150 ms desde el aterrizaje           |
+| Techo encadenando              | ×1,7 de la carrera del arma equipada |
 
-La clave del "feel" está en dos detalles. La aceleración limita la *proyección* de
+La clave del "feel" está en dos detalles. La aceleración limita la _proyección_ de
 la velocidad sobre la dirección deseada, no su módulo: por eso girar mientras se
 strafea en el aire añade velocidad indefinidamente. Y la fricción pasa a ser
 constante por debajo de 80 u/s, que es lo que permite pararse en seco.
@@ -176,7 +177,7 @@ El bunnyhop se apoya en las dos: se gana velocidad en el aire con el strafe y se
 conserva si el siguiente salto sale dentro de los 150 ms posteriores al contacto,
 porque dentro de esa ventana el suelo todavía no aplica fricción. Fuera de ella la
 velocidad se recorta a ×1,1 de la carrera y la cadena se rompe. El techo es
-relativo al arma equipada (×1,7 de *su* carrera), de modo que encadenar saltos no
+relativo al arma equipada (×1,7 de _su_ carrera), de modo que encadenar saltos no
 borra el peso de llevar la sniper encima. Sigue haciendo falta soltar el espacio
 entre salto y salto: no hay auto-bhop.
 
@@ -224,16 +225,53 @@ npm start            # sirve el juego compilado en :8080
 npm test             # toda la batería de tests
 npm run test:coverage
 npm run typecheck    # comprobación de tipos de todo el monorepo
-npm run check        # typecheck + tests (lo que corre en CI)
+npm run lint         # ESLint con tipos + Prettier + knip (código muerto)
+npm run format       # reescribe el formato con Prettier
+npm run check        # typecheck + lint + tests (lo que corre en CI)
 ```
 
 Variables de entorno del servidor: `PORT` (8080) y `HOST` (0.0.0.0).
 
 ---
 
+## Estilo y linter
+
+`npm run lint` son tres cosas: ESLint con `typescript-eslint` en modo **strict
+con tipos**, Prettier comprobando el formato y [knip](https://knip.dev) buscando
+exportaciones y ficheros que no usa nadie. Entra en `npm run check` y en CI, así
+que un fallo de estilo rompe la rama igual que un test.
+
+Knip cubre el hueco que ESLint no puede: una regla de ESLint solo ve un fichero
+cada vez, así que detecta variables sin usar pero no una _exportación_ que no
+importa nadie, que es la forma que tiene el código muerto de sobrevivir en un
+monorepo.
+
+Las reglas con tipos necesitan un programa de TypeScript que abarque también los
+tests y los ficheros de configuración, que el build no compila. Ese es
+`tsconfig.lint.json`: junta todo el monorepo en un solo programa y solo lo usa el
+linter -- el build de verdad siguen siendo los tres `tsconfig.json` de cada
+paquete, que separan a propósito lo que ve el cliente (DOM) de lo que ve el
+servidor (Node).
+
+Dos reglas del preajuste estricto están ajustadas a propósito, y el motivo está
+escrito en `eslint.config.js`:
+
+- **`no-non-null-assertion` desactivada.** El proyecto compila con
+  `noUncheckedIndexedAccess`, así que `a[i]` es `T | undefined` en todas partes.
+  El `!` es la contrapartida obligada de esa elección -- buffers circulares,
+  nodos del grafo de navegación --, no un atajo: prohibirlo sería castigar la
+  comprobación más estricta.
+- **`restrict-template-expressions` con `allowNumber`.** Interpolar un número en
+  un mensaje de log o del HUD es exactamente lo que se quiere.
+
+Prettier formatea también el Markdown, con `proseWrap` por defecto: no reflowea
+la prosa, solo alinea tablas y normaliza el énfasis.
+
+---
+
 ## Tests
 
-335 tests, ~97% de cobertura sobre la simulación y el servidor.
+407 tests, ~98% de cobertura sobre la simulación y el servidor.
 
 ```
 packages/shared/test/   Física, colisión, armas, hitscan, reglas, protocolo, mapa

@@ -11,10 +11,10 @@ import { MAX_HEALTH, clamp } from '@neonduel/shared';
 
 import type { MatchPhase } from '@neonduel/shared';
 
-const byId = <T extends HTMLElement>(id: string): T => {
+const byId = (id: string): HTMLElement => {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Falta el elemento del HUD: ${id}`);
-  return element as T;
+  return element;
 };
 
 /** Una linea del marcador, ya formateada por quien sabe de la partida. */
@@ -223,10 +223,13 @@ export class Hud {
     this.hitmarker.classList.add('is-visible');
 
     if (this.hitmarkerTimer) clearTimeout(this.hitmarkerTimer);
-    this.hitmarkerTimer = setTimeout(() => {
-      this.hitmarker.classList.add('is-fading');
-      this.hitmarker.classList.remove('is-visible');
-    }, kill ? 220 : 90);
+    this.hitmarkerTimer = setTimeout(
+      () => {
+        this.hitmarker.classList.add('is-fading');
+        this.hitmarker.classList.remove('is-visible');
+      },
+      kill ? 220 : 90,
+    );
   }
 
   flashDamage(intensity = 1): void {

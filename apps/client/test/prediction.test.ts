@@ -251,16 +251,14 @@ describe('prediccion con perdida de paquetes', () => {
   it('converge aunque se pierdan instantaneas por el camino', () => {
     const prediction = new PredictionSystem(spawn(), ATRIUM_WORLD);
     const server = spawn();
-    let lastAck = 0;
 
     for (let i = 1; i <= 120; i++) {
       const command = cmd(i, BUTTON.FORWARD | (i % 16 === 0 ? BUTTON.JUMP : 0), i);
       prediction.apply(command);
       simulatePlayerTick(server, command, ATRIUM_WORLD);
-      lastAck = i;
 
       // Solo una de cada cinco instantaneas llega.
-      if (i % 5 === 0) prediction.reconcile(snapshotOf(server), lastAck);
+      if (i % 5 === 0) prediction.reconcile(snapshotOf(server), i);
     }
 
     const finalError = Math.hypot(

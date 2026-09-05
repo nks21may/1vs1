@@ -51,7 +51,11 @@ describe('camara de muerte', () => {
   it('gira por el camino corto', () => {
     const cam = createDeathCamera(vec3(0, 0, 100), 170, 0, 7);
     // El asesino esta a yaw -170: son 20 grados por un lado y 340 por el otro.
-    const killer = vec3(Math.cos((-170 * Math.PI) / 180) * 800, Math.sin((-170 * Math.PI) / 180) * 800, 100);
+    const killer = vec3(
+      Math.cos((-170 * Math.PI) / 180) * 800,
+      Math.sin((-170 * Math.PI) / 180) * 800,
+      100,
+    );
 
     updateDeathCamera(cam, killer, 1 / 60);
 

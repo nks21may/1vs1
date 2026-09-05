@@ -1,12 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { PLAYER_HEIGHT_DUCKED, PLAYER_HEIGHT_STANDING } from '../src/constants.js';
-import {
-  hasLineOfSight,
-  playerHitboxes,
-  shotDirection,
-  traceHitscan,
-} from '../src/hitscan.js';
+import { hasLineOfSight, playerHitboxes, shotDirection, traceHitscan } from '../src/hitscan.js';
 import { vec3 } from '../src/math.js';
 import { brush, flatWorld } from './helpers.js';
 
@@ -18,13 +13,7 @@ const shootAt = (targetZ: number, targets = [target], scene = world) => {
   const origin = vec3(0, 0, 64);
   const dir = vec3(500 - origin.x, 0, targetZ - origin.z);
   const len = Math.hypot(dir.x, dir.y, dir.z);
-  return traceHitscan(
-    scene,
-    targets,
-    origin,
-    vec3(dir.x / len, dir.y / len, dir.z / len),
-    8192,
-  );
+  return traceHitscan(scene, targets, origin, vec3(dir.x / len, dir.y / len, dir.z / len), 8192);
 };
 
 describe('playerHitboxes', () => {

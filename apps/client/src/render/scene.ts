@@ -60,8 +60,7 @@ export const PALETTE = {
 } as const;
 
 /** Convierte una posicion de la simulacion (Z-up) a coordenadas de three (Y-up). */
-export const toThree = (v: Vec3, out = new Vector3()): Vector3 =>
-  out.set(v.x, v.z, -v.y);
+export const toThree = (v: Vec3, out = new Vector3()): Vector3 => out.set(v.x, v.z, -v.y);
 
 /** Convierte los angulos de vista de la simulacion a rotacion de camara. */
 export const applyViewAngles = (

@@ -12,7 +12,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { WebSocketServer, type WebSocket } from 'ws';
+import { WebSocketServer, type RawData, type WebSocket } from 'ws';
 
 import { PROTOCOL_VERSION, getMap, parseClientMessage, sanitizeName } from '@neonduel/shared';
 
@@ -26,10 +26,17 @@ const MAX_MESSAGES_PER_SECOND = 200;
 
 const BOT_SKILLS = new Set<string>(['easy', 'normal', 'hard']);
 
-const CLIENT_DIST = resolve(
-  fileURLToPath(new URL('.', import.meta.url)),
-  '../../client/dist',
-);
+/**
+ * `ws` entrega cada mensaje como Buffer, como ArrayBuffer o como lista de
+ * Buffers segun como haya llegado troceado por la red; nunca como texto.
+ */
+const decodeMessage = (raw: RawData): string => {
+  if (Buffer.isBuffer(raw)) return raw.toString('utf8');
+  if (Array.isArray(raw)) return Buffer.concat(raw).toString('utf8');
+  return Buffer.from(raw).toString('utf8');
+};
+
+const CLIENT_DIST = resolve(fileURLToPath(new URL('.', import.meta.url)), '../../client/dist');
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -86,17 +93,12 @@ export const startServer = async (options: StartOptions = {}): Promise<ServerHan
 
   const game = new GameServer();
 
-  const serveStatic = async (
-    req: IncomingMessage,
-    res: ServerResponse,
-  ): Promise<void> => {
+  const serveStatic = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const url = new URL(req.url ?? '/', 'http://localhost');
 
     if (url.pathname === '/health') {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(
-        JSON.stringify({ ok: true, sessions: game.sessionCount, version: PROTOCOL_VERSION }),
-      );
+      res.end(JSON.stringify({ ok: true, sessions: game.sessionCount, version: PROTOCOL_VERSION }));
       return;
     }
 
@@ -114,8 +116,7 @@ export const startServer = async (options: StartOptions = {}): Promise<ServerHan
       const body = await readFile(filePath);
       res.writeHead(200, {
         'content-type': MIME_TYPES[extname(filePath)] ?? 'application/octet-stream',
-        'cache-control':
-          requested === '/index.html' ? 'no-cache' : 'public, max-age=3600',
+        'cache-control': requested === '/index.html' ? 'no-cache' : 'public, max-age=3600',
       });
       res.end(body);
     } catch {
@@ -157,7 +158,7 @@ export const startServer = async (options: StartOptions = {}): Promise<ServerHan
         return;
       }
 
-      const text = typeof raw === 'string' ? raw : raw.toString('utf8');
+      const text = decodeMessage(raw);
       if (text.length > MAX_MESSAGE_BYTES) return;
 
       const message = parseClientMessage(text);
