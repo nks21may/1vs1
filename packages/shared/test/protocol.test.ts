@@ -9,8 +9,8 @@ import {
   sanitizeName,
 } from '../src/protocol.js';
 
-const inputPacket = (cmds: unknown[], interp: unknown = 100, rtt: unknown = 40) =>
-  JSON.stringify({ t: 'input', cmds, interp, rtt });
+const inputPacket = (cmds: unknown[], ackTick: unknown = 40) =>
+  JSON.stringify({ t: 'input', cmds, ackTick });
 
 const validCommand = {
   seq: 5,
@@ -39,7 +39,7 @@ describe('parseClientMessage', () => {
   it('acepta un paquete de entrada valido', () => {
     const msg = parseClientMessage(inputPacket([validCommand]));
     expect(msg?.t).toBe('input');
-    expect(msg).toMatchObject({ interp: 100 });
+    expect(msg).toMatchObject({ ackTick: 40 });
   });
 
   it('rechaza paquetes vacios o demasiado grandes', () => {
@@ -98,22 +98,24 @@ describe('parseClientMessage', () => {
     expect(ranura(undefined)).toBe(0);
   });
 
-  it('acota el retardo de interpolacion declarado por el cliente', () => {
-    const msg = parseClientMessage(inputPacket([validCommand], 99999));
-    expect(msg).toMatchObject({ interp: 500 });
+  it('el tick reconocido es un entero no negativo', () => {
+    expect(parseClientMessage(inputPacket([validCommand], 12.7))).toMatchObject({ ackTick: 12 });
+    expect(parseClientMessage(inputPacket([validCommand], -50))).toMatchObject({ ackTick: 0 });
+    expect(parseClientMessage(inputPacket([validCommand], 'x'))).toMatchObject({ ackTick: 0 });
+    // Ausente es valido: significa que aun no se ha visto ninguna instantanea.
+    expect(parseClientMessage(JSON.stringify({ t: 'input', cmds: [validCommand] }))).toMatchObject({
+      ackTick: 0,
+    });
   });
 
-  it('acota el rtt declarado por el cliente', () => {
-    expect(parseClientMessage(inputPacket([validCommand], 100, 99999))).toMatchObject({
-      rtt: 1000,
-    });
-    expect(parseClientMessage(inputPacket([validCommand], 100, -50))).toMatchObject({
-      rtt: 0,
-    });
-    // Ausente es valido: se asume cero.
-    expect(parseClientMessage(JSON.stringify({ t: 'input', cmds: [validCommand] }))).toMatchObject({
-      rtt: 0,
-    });
+  it('el paquete de entrada ya no admite una latencia declarada', () => {
+    // Antes el cliente mandaba su propio `rtt` y el servidor rebobinaba con el.
+    // Ahora la mide el servidor, asi que el campo no llega a existir.
+    const msg = parseClientMessage(
+      JSON.stringify({ t: 'input', cmds: [validCommand], ackTick: 40, rtt: 99999, interp: 500 }),
+    );
+    expect(msg).toMatchObject({ t: 'input', ackTick: 40 });
+    expect(Object.keys(msg!).sort()).toEqual(['ackTick', 'cmds', 't']);
   });
 
   it('un ping conserva la marca de tiempo del cliente', () => {

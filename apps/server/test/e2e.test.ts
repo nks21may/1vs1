@@ -43,11 +43,16 @@ class TestClient {
   readonly messages: ServerMessage[] = [];
   private readonly socket: WebSocket;
   private seq = 0;
+  private lastTick = 0;
 
   constructor(query = '') {
     this.socket = new WebSocket(`ws://127.0.0.1:${server.port}/${query}`);
     this.socket.on('message', (data) => {
-      this.messages.push(JSON.parse(textOf(data)) as ServerMessage);
+      const message = JSON.parse(textOf(data)) as ServerMessage;
+      // Igual que el navegador: el ultimo tick visto viaja en cada paquete de
+      // entrada, y es con el con lo que el servidor mide la latencia.
+      if (message.t === 'snapshot') this.lastTick = message.tick;
+      this.messages.push(message);
     });
   }
 
@@ -73,8 +78,7 @@ class TestClient {
     this.send({
       t: 'input',
       cmds: [{ seq: this.seq, buttons, yaw, pitch, dt: TICK_DT }],
-      interp: 100,
-      rtt: 0,
+      ackTick: this.lastTick,
     });
     return this.seq;
   }

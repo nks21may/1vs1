@@ -113,6 +113,10 @@ export const INTERP_DELAY_MS = 100;
 export const MAX_REWIND_MS = 200;
 /** Historial de estados que guarda el servidor para la compensacion. */
 export const LAG_COMPENSATION_HISTORY_TICKS = 32;
+/** Medidas de latencia sobre las que decide el servidor: un segundo a 64 Hz. */
+export const LATENCY_SAMPLES = TICK_RATE;
+/** Techo de una medida suelta. Por encima la conexion ya no es jugable. */
+export const MAX_LATENCY_SAMPLE_MS = 1000;
 /** Comandos de entrada maximos que se aceptan por paquete (anti flood). */
 export const MAX_COMMANDS_PER_PACKET = 16;
 /** Comandos maximos que el servidor procesa por tick de un mismo cliente. */

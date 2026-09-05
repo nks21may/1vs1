@@ -11,11 +11,13 @@ import {
   ATRIUM,
   BUTTON,
   DEFAULT_MATCH_CONFIG,
+  INTERP_DELAY_MS,
   MAX_COMMANDS_PER_TICK,
   MAX_HEALTH,
   PLAYER_HEIGHT_STANDING,
   SNAPSHOT_FLAG,
   TICK_DT,
+  TICK_INTERVAL_MS,
   type UserCommand,
   accuracy,
   createCollisionWorld,
@@ -42,6 +44,14 @@ const ticks = (session: MatchSession, count: number) => {
   for (let i = 0; i < count; i++) session.update();
 };
 
+/**
+ * Ticks que hay que dejar correr despues de colocar a los jugadores a mano.
+ * El servidor rebobina el retardo de interpolacion en todos los disparos, asi
+ * que colocarlos y disparar en el mismo instante resolveria la bala contra un
+ * historial que todavia los tiene en el punto de aparicion.
+ */
+const SETTLE_TICKS = Math.ceil(INTERP_DELAY_MS / TICK_INTERVAL_MS) + 1;
+
 /** Avanza hasta que la ronda esta en juego. */
 const goLive = (session: MatchSession) => {
   let guard = 0;
@@ -56,7 +66,12 @@ const cmd = (seq: number, buttons = 0, yaw = 0, pitch = 0): UserCommand => ({
   dt: TICK_DT,
 });
 
-const input = (cmds: UserCommand[]) => ({ t: 'input', cmds, interp: 0, rtt: 0 }) as const;
+/**
+ * `ackTick` es la instantanea que el cliente dice estar viendo, y es lo unico
+ * con lo que el servidor mide su latencia. Por defecto va a cero: un cliente
+ * que aun no ha aplicado ninguna, o sea sin latencia medida.
+ */
+const input = (cmds: UserCommand[], ackTick = 0) => ({ t: 'input', cmds, ackTick }) as const;
 
 describe('conexion a la partida', () => {
   it('envia la bienvenida con el identificador asignado', () => {
@@ -245,6 +260,7 @@ describe('disparos', () => {
     target.pos = vec3(-700 + distance, -300, 0);
     target.vel = vec3();
     target.onGround = true;
+    ticks(session, SETTLE_TICKS);
     return { shooter, target };
   };
 
@@ -350,56 +366,104 @@ describe('disparos', () => {
   });
 });
 
+/**
+ * La latencia no se declara: el cliente va reconociendo instantaneas y el
+ * servidor mide cuanto tardan en volver. Un tick son 15,625 ms, asi que
+ * reconocer 7 ticks por detras equivale a 109 ms de ida y vuelta.
+ */
+const latencyScenario = (lagTicks: number, packets = 20) => {
+  const { session } = newSession();
+  goLive(session);
+
+  const shooter = session.playerOf(1)!;
+  const target = session.playerOf(2)!;
+  shooter.pos = vec3(-700, -300, 0);
+  shooter.onGround = true;
+  target.pos = vec3(-300, -300, 0);
+  target.onGround = true;
+
+  let seq = 0;
+  const ackFor = (lag: number) => Math.max(1, session.tick - lag);
+  const report = (lag: number, count = 1) => {
+    for (let i = 0; i < count; i++) {
+      session.handleMessage(1, input([cmd(++seq)], ackFor(lag)));
+      session.update();
+    }
+  };
+  const shoot = (lag: number) => {
+    session.handleMessage(1, input([cmd(++seq, BUTTON.ATTACK, 0, 0)], ackFor(lag)));
+    session.update();
+  };
+
+  // Ventana entera de medidas antes de que pase nada interesante.
+  report(lagTicks, packets);
+  return { session, shooter, target, shoot };
+};
+
+/** Saca al objetivo de la linea de tiro y deja pasar `after` ticks. */
+const dodge = (scenario: ReturnType<typeof latencyScenario>, after: number) => {
+  scenario.target.pos = vec3(-300, -100, 0);
+  ticks(scenario.session, after);
+};
+
 describe('compensacion de latencia', () => {
   it('acierta a donde el cliente veia al rival, no a donde esta ahora', () => {
-    const { session } = newSession();
-    goLive(session);
+    const escena = latencyScenario(7);
+    dodge(escena, 3);
 
-    const shooter = session.playerOf(1)!;
-    const target = session.playerOf(2)!;
-    shooter.pos = vec3(-700, -300, 0);
-    shooter.onGround = true;
-    target.pos = vec3(-300, -300, 0);
-    target.onGround = true;
+    // 55 ms de ida mas 100 de interpolacion: casi diez ticks atras, cuando el
+    // objetivo todavia estaba en la linea de tiro.
+    escena.shoot(7);
 
-    // Se acumula historial con el objetivo quieto.
-    ticks(session, 20);
-
-    // El objetivo se aparta de golpe fuera de la linea de tiro.
-    target.pos = vec3(-300, -100, 0);
-    ticks(session, 3);
-
-    // Un cliente con 150 ms de ida y vuelta dispara a la posicion que veia.
-    session.handleMessage(1, {
-      t: 'input',
-      cmds: [cmd(1, BUTTON.ATTACK, 0, 0)],
-      interp: 100,
-      rtt: 150,
-    });
-    session.update();
-
-    expect(target.health).toBeLessThan(MAX_HEALTH);
+    expect(escena.target.health).toBeLessThan(MAX_HEALTH);
   });
 
-  it('sin latencia declarada se dispara al presente', () => {
-    const { session } = newSession();
-    goLive(session);
+  it('sin latencia medida se rebobina solo el retardo de interpolacion', () => {
+    // Nadie dibuja el presente: todo cliente va 100 ms por detras, asi que ese
+    // rebobinado existe aunque la latencia medida sea cero. Son 6,4 ticks.
+    const cerca = latencyScenario(0);
+    dodge(cerca, 3);
+    cerca.shoot(0);
+    expect(cerca.target.health).toBeLessThan(MAX_HEALTH);
 
-    const shooter = session.playerOf(1)!;
-    const target = session.playerOf(2)!;
-    shooter.pos = vec3(-700, -300, 0);
-    shooter.onGround = true;
-    target.pos = vec3(-300, -300, 0);
-    target.onGround = true;
-    ticks(session, 20);
+    const lejos = latencyScenario(0);
+    dodge(lejos, 10);
+    lejos.shoot(0);
+    expect(lejos.target.health).toBe(MAX_HEALTH);
+  });
 
-    target.pos = vec3(-300, -100, 0);
-    ticks(session, 3);
+  it('inflar la latencia justo al disparar no consigue mas rebobinado', () => {
+    const escena = latencyScenario(0);
+    dodge(escena, 10);
 
-    session.handleMessage(1, input([cmd(1, BUTTON.ATTACK, 0, 0)]));
-    session.update();
+    // El paquete del disparo dice ir 12 ticks por detras. De creerselo serian
+    // 194 ms de rebobinado, de sobra para alcanzar al objetivo donde estaba;
+    // pero la estimacion es el minimo de la ventana, y la ventana esta limpia.
+    escena.shoot(12);
 
-    expect(target.health).toBe(MAX_HEALTH);
+    expect(escena.target.health).toBe(MAX_HEALTH);
+  });
+
+  it('decir que se ha visto una instantanea del futuro no compensa nada', () => {
+    const escena = latencyScenario(0);
+    dodge(escena, 10);
+
+    // Un tick que el servidor aun no ha enviado da una medida negativa, que
+    // vale cero: la mentira no puede hacer que le compensen de mas.
+    escena.shoot(-1000);
+
+    expect(escena.target.health).toBe(MAX_HEALTH);
+  });
+
+  it('ni sosteniendo la mentira se rebobina mas alla del tope', () => {
+    // Aqui el cliente miente en todos los paquetes, que es lo unico que mueve
+    // el minimo. Ningun servidor puede distinguir eso de ir retrasado de
+    // verdad, y por eso existe el tope: 200 ms, o sea 12,8 ticks.
+    const escena = latencyScenario(40);
+    dodge(escena, 20);
+    escena.shoot(40);
+
+    expect(escena.target.health).toBe(MAX_HEALTH);
   });
 });
 
@@ -636,6 +700,7 @@ describe('estadisticas de la partida', () => {
     target.pos = vec3(-300, -300, 0);
     target.vel = vec3();
     target.onGround = true;
+    ticks(session, SETTLE_TICKS);
     return { shooter, target };
   };
 

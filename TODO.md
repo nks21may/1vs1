@@ -445,12 +445,45 @@ así se pudra.
     marcador con Tab, salir de la partida (que es donde se libera la malla del
     mapa) y volver a entrar. Sin un solo error de consola.
 
-- [ ] **T11. El servidor mide la latencia**
+- [x] **T11. El servidor mide la latencia**
       Hoy el cliente declara su `rtt` y el servidor lo usa para rebobinar. Está acotado
       a 200 ms, así que el abuso posible es pequeño, pero medirlo en el servidor a
       partir del retraso de los comandos recibidos elimina el problema de raíz.
   - Hecho cuando: `computeRewindTime` usa una latencia estimada por el servidor y
     hay test de que un cliente que miente no consigue más rebobinado.
+  - **Hecho (2026-09-05).** El paquete de entrada ya no lleva `rtt` ni `interp`:
+    lleva `ackTick`, la última instantánea que el cliente ha aplicado. Como el
+    servidor sabe cuándo envió ese tick, la distancia hasta su reloj es el viaje
+    de ida y vuelta, medido entero con su propio reloj. El número que viaja no es
+    una latencia, es un tick que produjo él mismo. Protocolo 2 → 3.
+  - **Desviación del enunciado: no es "el retraso de los comandos recibidos".**
+    Sin un reloj común, el flujo de llegada de comandos solo da retraso
+    _relativo_ (jitter), nunca latencia absoluta: para eso hace falta algo que
+    vaya y vuelva. `ackTick` es ese algo, y tiene la ventaja de que el cliente no
+    puede inventárselo, solo elegir cuál de los ticks que ya existen señala.
+  - **El estadístico es el mínimo de la ventana** (`LatencyEstimator`, un segundo
+    a 64 Hz), no la última medida. La red solo añade retraso, así que el mínimo
+    es la mejor estimación del camino real, y sobre todo: inflar la latencia
+    justo al disparar deja de servir de nada, porque para mover el mínimo hay que
+    sostener la mentira un segundo entero. Se compensa un poco de menos con
+    jitter alto, que es el lado por el que conviene equivocarse.
+  - **Lo que sigue sin poder hacerse, y conviene tenerlo escrito:** ningún
+    servidor puede distinguir a un cliente que _dice_ ir retrasado de uno que lo
+    va de verdad. Un tramposo que sostenga la mentira en todos los paquetes
+    llegará al tope. Lo que se ha quitado es que le salga gratis y a demanda: hay
+    test de que el pico justo al disparar no consigue nada, de que decir haber
+    visto una instantánea del futuro tampoco, y de que ni sosteniéndola se pasa
+    de `MAX_REWIND_MS`.
+  - **Efecto de quitar el `interp` declarado:** el retardo de interpolación es
+    una constante del protocolo, así que ahora _todos_ los disparos rebobinan al
+    menos 100 ms, también los de un cliente sin latencia. Antes era igual en la
+    práctica (el cliente real siempre mandaba 100), pero los tests colocaban a
+    los jugadores a mano y disparaban en el mismo instante, con `interp: 0`. Ese
+    escenario no existe en el juego: ahora dejan asentar el historial
+    (`SETTLE_TICKS`) antes de disparar, que es lo que pasa de verdad.
+  - Verificado en Chrome contra el servidor real, espiando el WebSocket: los
+    paquetes de entrada llevan exactamente `{t, cmds, ackTick}`, el `ackTick`
+    crece, se corre y se dispara (la munición baja) y no hay errores de consola.
 
 - [ ] **T12. Reconexión**
       Si se cae el socket se pierde la partida. Guardar la sesión unos segundos con un

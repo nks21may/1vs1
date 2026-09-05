@@ -8,7 +8,6 @@
  */
 
 import {
-  INTERP_DELAY_MS,
   PROTOCOL_VERSION,
   type ServerMessage,
   type SnapshotMessage,
@@ -35,6 +34,12 @@ export class NetClient {
   private recentCommands: UserCommand[] = [];
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private rttSamples: number[] = [];
+  /**
+   * Ultima instantanea aplicada. Viaja con cada paquete de entrada porque es
+   * con lo que el servidor mide la latencia: el numero que se le manda no es
+   * una latencia declarada, sino un tick que el mismo produjo.
+   */
+  private lastSnapshotTick = 0;
 
   status: ConnectionStatus = 'idle';
   /** Ida y vuelta suavizada, en ms. */
@@ -83,6 +88,7 @@ export class NetClient {
     this.socket = null;
     this.recentCommands = [];
     this.rttSamples = [];
+    this.lastSnapshotTick = 0;
   }
 
   /** Envia un comando junto a los ultimos, por redundancia. */
@@ -91,12 +97,7 @@ export class NetClient {
     if (this.recentCommands.length > REDUNDANT_COMMANDS + 1) {
       this.recentCommands.shift();
     }
-    this.send({
-      t: 'input',
-      cmds: this.recentCommands,
-      interp: INTERP_DELAY_MS,
-      rtt: Math.round(this.rtt),
-    });
+    this.send({ t: 'input', cmds: this.recentCommands, ackTick: this.lastSnapshotTick });
   }
 
   private handle(message: ServerMessage): void {
@@ -105,6 +106,7 @@ export class NetClient {
         this.handlers.onWelcome(message);
         break;
       case 'snapshot':
+        this.lastSnapshotTick = message.tick;
         this.handlers.onSnapshot(message, performance.now());
         break;
       case 'pong': {

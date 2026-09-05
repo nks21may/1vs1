@@ -1,12 +1,62 @@
 import { describe, expect, it } from 'vitest';
 
-import { MAX_REWIND_MS } from '../src/constants.js';
-import { LagCompensationBuffer, computeRewindTime, toHitboxTargets } from '../src/lagcomp.js';
+import { MAX_LATENCY_SAMPLE_MS, MAX_REWIND_MS } from '../src/constants.js';
+import {
+  LagCompensationBuffer,
+  LatencyEstimator,
+  computeRewindTime,
+  toHitboxTargets,
+} from '../src/lagcomp.js';
 
 const frame = (tick: number, timeMs: number, x: number) => ({
   tick,
   timeMs,
   players: [{ id: 1, pos: { x, y: 0, z: 0 }, ducking: false, alive: true }],
+});
+
+describe('LatencyEstimator', () => {
+  it('sin medidas no compensa nada', () => {
+    expect(new LatencyEstimator().oneWayMs).toBe(0);
+  });
+
+  it('la latencia de ida es la mitad del viaje observado', () => {
+    const latency = new LatencyEstimator();
+    latency.record(60);
+    expect(latency.oneWayMs).toBe(30);
+  });
+
+  it('se queda con el minimo de la ventana, no con la ultima medida', () => {
+    const latency = new LatencyEstimator();
+    latency.record(40);
+    latency.record(300);
+    latency.record(500);
+    // La red solo puede anadir retraso: el minimo es la mejor estimacion del
+    // camino real, y un pico suelto no consigue ni un ms mas de rebobinado.
+    expect(latency.oneWayMs).toBe(20);
+  });
+
+  it('un tick del futuro cuenta como cero, no como una medida negativa', () => {
+    const latency = new LatencyEstimator();
+    latency.record(-500);
+    latency.record(200);
+    expect(latency.oneWayMs).toBe(0);
+  });
+
+  it('una medida absurda se recorta antes de entrar', () => {
+    const latency = new LatencyEstimator(2);
+    latency.record(999999);
+    latency.record(999999);
+    expect(latency.oneWayMs).toBe(MAX_LATENCY_SAMPLE_MS / 2);
+  });
+
+  it('la ventana olvida: una medida vieja deja de contar', () => {
+    const latency = new LatencyEstimator(3);
+    latency.record(20);
+    for (let i = 0; i < 3; i++) latency.record(200);
+    // Los 20 ms ya han salido de la ventana.
+    expect(latency.oneWayMs).toBe(100);
+    expect(latency.size).toBe(3);
+  });
 });
 
 describe('LagCompensationBuffer', () => {

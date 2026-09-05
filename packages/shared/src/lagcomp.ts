@@ -6,11 +6,17 @@
  * viendo realmente (su reloj menos su interpolacion) y evalua el hitscan ahi.
  * Sin esto habria que "liderar" al rival en proporcion al ping.
  *
- * El rebobinado esta acotado por `MAX_REWIND_MS` para que un cliente no pueda
- * declarar una latencia arbitraria y disparar al pasado remoto.
+ * La latencia con la que se rebobina la mide el propio servidor
+ * (`LatencyEstimator`), y ademas va acotada por `MAX_REWIND_MS`: ni se declara
+ * ni, aunque se falsee, se puede disparar a un pasado arbitrario.
  */
 
-import { LAG_COMPENSATION_HISTORY_TICKS, MAX_REWIND_MS } from './constants.js';
+import {
+  LAG_COMPENSATION_HISTORY_TICKS,
+  LATENCY_SAMPLES,
+  MAX_LATENCY_SAMPLE_MS,
+  MAX_REWIND_MS,
+} from './constants.js';
 import type { HitboxSource } from './hitscan.js';
 import { clamp, lerpVec3, vec3 } from './math.js';
 
@@ -120,6 +126,58 @@ export const interpolateFrames = (
       alive: t < 0.5 ? sampleA.alive : sampleB.alive,
     };
   });
+
+/**
+ * Latencia de un cliente, medida por el servidor.
+ *
+ * Cada paquete de entrada dice que instantanea esta viendo el cliente. El
+ * servidor sabe cuando envio esa instantanea, asi que la distancia hasta su
+ * reloj es el viaje de ida y vuelta completo. La medida es enteramente suya: el
+ * cliente no declara ningun numero, solo senala un tick que el servidor mismo
+ * produjo.
+ *
+ * Se guarda el **minimo** de la ventana, no la ultima medida. La red solo puede
+ * anadir retraso, nunca quitarlo, asi que el minimo es la mejor estimacion del
+ * camino real; y de paso hace inutil la trampa que importa, que es inflar la
+ * latencia justo en el momento de disparar: para mover el minimo hay que
+ * sostener la mentira durante toda la ventana.
+ *
+ * Lo que ningun servidor puede distinguir es a un cliente que *dice* ir
+ * retrasado de uno que lo va de verdad. Contra eso solo esta el tope de
+ * `MAX_REWIND_MS`, que es el que acota el rebobinado maximo.
+ */
+export class LatencyEstimator {
+  private readonly samples: number[];
+  private writeIndex = 0;
+  private count = 0;
+
+  constructor(private readonly capacity: number = LATENCY_SAMPLES) {
+    this.samples = new Array<number>(capacity).fill(0);
+  }
+
+  get size(): number {
+    return this.count;
+  }
+
+  /**
+   * Anota un viaje de ida y vuelta observado. Una medida negativa significa que
+   * el cliente dice haber visto una instantanea que aun no existe: se anota
+   * como cero, que es no compensarle nada.
+   */
+  record(roundTripMs: number): void {
+    this.samples[this.writeIndex] = clamp(roundTripMs, 0, MAX_LATENCY_SAMPLE_MS);
+    this.writeIndex = (this.writeIndex + 1) % this.capacity;
+    this.count = Math.min(this.count + 1, this.capacity);
+  }
+
+  /** Latencia de ida, que es la mitad del viaje. Cero mientras no haya medidas. */
+  get oneWayMs(): number {
+    if (this.count === 0) return 0;
+    let min = Infinity;
+    for (let i = 0; i < this.count; i++) min = Math.min(min, this.samples[i]!);
+    return min / 2;
+  }
+}
 
 /**
  * Instante al que hay que rebobinar para un cliente concreto.

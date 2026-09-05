@@ -15,7 +15,7 @@ import type { MatchPhase, RoundEndReason } from './match.js';
 import type { UserCommand } from './movement.js';
 import { WEAPON_SLOTS, type HitGroup, type WeaponId } from './weapons.js';
 
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 // --- Cliente -> Servidor ---
 
@@ -29,15 +29,15 @@ export interface InputMessage {
   t: 'input';
   /** Comandos redundantes: se reenvian los ultimos por si se pierde un paquete. */
   cmds: UserCommand[];
-  /** Retardo de interpolacion que el cliente esta aplicando, en ms. */
-  interp: number;
   /**
-   * Ida y vuelta medida por el cliente, en ms. El servidor la usa para rebobinar
-   * al instante que el cliente veia. Es un dato declarado por el cliente, asi
-   * que se acota aqui y otra vez en `computeRewindTime`: lo maximo que se puede
-   * conseguir mintiendo es un rebobinado de `MAX_REWIND_MS`.
+   * Tick de la ultima instantanea que el cliente ha aplicado.
+   *
+   * Con el, el servidor mide su latencia con su propio reloj: sabe cuando envio
+   * ese tick, asi que la distancia hasta ahora es el viaje de ida y vuelta. El
+   * cliente no declara ningun numero, solo senala un tick que produjo el
+   * servidor; `0` significa "aun no he visto ninguna" y no genera medida.
    */
-  rtt: number;
+  ackTick: number;
 }
 
 export interface PingMessage {
@@ -256,9 +256,10 @@ export const parseClientMessage = (raw: string): ClientMessage | null => {
         if (!cmd) return null;
         cmds.push(cmd);
       }
-      const interp = isFiniteNumber(msg.interp) ? Math.max(0, Math.min(500, msg.interp)) : 0;
-      const rtt = isFiniteNumber(msg.rtt) ? Math.max(0, Math.min(1000, msg.rtt)) : 0;
-      return { t: 'input', cmds, interp, rtt };
+      // Un tick del futuro no se rechaza: el servidor lo convierte en una
+      // medida negativa, que vale cero, o sea ninguna compensacion.
+      const ackTick = isFiniteNumber(msg.ackTick) ? Math.max(0, Math.floor(msg.ackTick)) : 0;
+      return { t: 'input', cmds, ackTick };
     }
     case 'ping': {
       if (!isFiniteNumber(msg.time)) return null;

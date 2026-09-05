@@ -20,6 +20,7 @@ import {
   INPUT_BUFFER_SIZE,
   INTERP_DELAY_MS,
   LagCompensationBuffer,
+  LatencyEstimator,
   MAX_COMMANDS_PER_TICK,
   type MatchConfig,
   MatchState,
@@ -30,6 +31,7 @@ import {
   SNAPSHOT_FLAG,
   type ShotRequest,
   TICK_DT,
+  TICK_INTERVAL_MS,
   TICK_RATE,
   type UserCommand,
   advanceFootstep,
@@ -69,8 +71,8 @@ interface Participant {
   highestSeq: number;
   /** Ultimo comando simulado, que se repite si el buffer se queda vacio. */
   lastCommand: UserCommand;
-  latencyMs: number;
-  interpMs: number;
+  /** Latencia medida por el servidor, no declarada por el cliente. */
+  latency: LatencyEstimator;
   /** Indice del punto de aparicion, alternado cada ronda. */
   spawnSlot: number;
   /**
@@ -142,8 +144,7 @@ export class MatchSession {
       lastProcessedSeq: 0,
       highestSeq: -1,
       lastCommand: { seq: 0, buttons: 0, yaw: spawn.yaw, pitch: 0, dt: TICK_DT },
-      latencyMs: 0,
-      interpMs: INTERP_DELAY_MS,
+      latency: new LatencyEstimator(),
       spawnSlot: slot,
       pendingViewYaw: spawn.yaw,
       footsteps: createFootstepTracker(),
@@ -180,9 +181,16 @@ export class MatchSession {
         break;
 
       case 'input': {
-        participant.interpMs = message.interp;
-        // La latencia declarada solo se usa para rebobinar, y ahi va acotada.
-        participant.latencyMs = message.rtt / 2;
+        // La latencia la mide el servidor: `ackTick` senala una instantanea que
+        // el propio servidor envio, y `timeMs` dice cuando fue. Un `0` es un
+        // cliente que aun no ha visto ninguna, y entonces no hay nada que medir.
+        //
+        // `timeMs` es el reloj simulado, que solo avanza al cerrar cada tick: si
+        // el bucle se retrasa, la medida sale corta y se compensa de menos, que
+        // es el lado por el que conviene equivocarse.
+        if (message.ackTick > 0) {
+          participant.latency.record(this.timeMs - message.ackTick * TICK_INTERVAL_MS);
+        }
         for (const cmd of message.cmds) {
           // Los comandos se reenvian por redundancia: solo interesan los nuevos.
           if (cmd.seq <= participant.highestSeq) continue;
@@ -305,10 +313,16 @@ export class MatchSession {
    * veia en su pantalla.
    */
   private resolveShot(participant: Participant, shot: ShotRequest): void {
-    const rewindTime = computeRewindTime(this.timeMs, participant.latencyMs, participant.interpMs);
+    // El retardo de interpolacion es una constante del protocolo, igual en
+    // todos los clientes: el servidor la sabe y no hace falta que se la digan.
+    const rewindTime = computeRewindTime(
+      this.timeMs,
+      participant.latency.oneWayMs,
+      INTERP_DELAY_MS,
+    );
     // El historial solo llega hasta el tick anterior. Si no hay nada que
-    // compensar (cliente local, o latencia declarada nula) se dispara contra el
-    // estado presente en lugar de arrastrar un tick de desfase artificial.
+    // compensar (un bot, o un cliente sin latencia medida todavia) se dispara
+    // contra el estado presente en lugar de arrastrar un tick de desfase.
     const newest = this.history.newest;
     const useLiveState = !newest || rewindTime >= newest.timeMs;
     const rewound = useLiveState ? [] : this.history.sampleAt(rewindTime);

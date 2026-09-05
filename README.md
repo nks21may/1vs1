@@ -133,8 +133,24 @@ de historial de posiciones. Al resolver un disparo, rebobina el mundo al momento
 que el tirador estaba viendo (su latencia más su interpolación) y evalúa el impacto
 ahí. Sin esto habría que apuntar por delante del rival en proporción al ping.
 
-El rebobinado está acotado a 200 ms y se recorta dos veces, así que lo máximo que
-se consigue mintiendo sobre la propia latencia es disparar a un pasado de 200 ms.
+**La latencia la mide el servidor, no la declara el cliente.** Cada paquete de
+entrada dice qué instantánea está viendo el cliente (`ackTick`), y como el
+servidor sabe cuándo envió ese tick, la distancia hasta su reloj es el viaje
+completo. El número que viaja no es una latencia: es un tick que produjo el
+propio servidor. El retardo de interpolación tampoco se declara -- es una
+constante del protocolo, igual en todos los clientes.
+
+De la ventana de un segundo de medidas se toma el **mínimo**, no la última. La
+red solo puede añadir retraso, nunca quitarlo, así que el mínimo es la mejor
+estimación del camino real; y hace inútil la trampa que importa, que es inflar la
+latencia justo en el instante de disparar: para mover el mínimo hay que sostener
+la mentira durante toda la ventana. El precio es que en una conexión con mucho
+jitter se compensa un poco de menos, que es el lado por el que conviene
+equivocarse en un duelo: la duda favorece a quien recibe el disparo.
+
+Lo que ningún servidor puede distinguir es a un cliente que _dice_ ir retrasado
+de uno que lo va de verdad. Contra eso está el tope: el rebobinado nunca pasa de
+200 ms, se sostenga la mentira lo que se sostenga.
 
 **El ángulo de vista lo fija el servidor al reaparecer.** Los ángulos viajan en
 cada comando del cliente, así que girar al jugador en el servidor no basta: el
@@ -145,6 +161,7 @@ aparecían mirando fuera del mapa.
 
 **El servidor no se fía de nada.** Valida cada mensaje antes de tocar la física
 (rechaza `NaN`, `dt` inflados, secuencias repetidas y bits de botón inventados),
+mide él mismo la latencia con la que rebobina,
 limita cuántos comandos procesa por tick para que recuperar un retraso no se
 convierta en correr más rápido, y aplica un presupuesto de mensajes por segundo.
 El cliente decide _qué teclas pulsa_; nada más.
@@ -271,7 +288,7 @@ la prosa, solo alinea tablas y normaliza el énfasis.
 
 ## Tests
 
-407 tests, ~98% de cobertura sobre la simulación y el servidor.
+416 tests, ~98% de cobertura sobre la simulación y el servidor.
 
 ```
 packages/shared/test/   Física, colisión, armas, hitscan, reglas, protocolo, mapa
