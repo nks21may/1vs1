@@ -341,12 +341,31 @@ así se pudra.
     ambos se recorren andando (380 y 400 unidades en 2,5 s) y no hay errores de
     consola.
 
-- [ ] **T08. Avatares animados**
+- [x] **T08. Avatares animados**
   Los rivales se deslizan rígidos. Con inclinación al correr y balanceo de piernas
   derivados de la velocidad interpolada, sin esqueleto ni assets, se lee mucho
   mejor lo que están haciendo.
   - Hecho cuando: el avatar refleja velocidad, dirección y salto en
     [players.ts](apps/client/src/render/players.ts).
+  - **Hecho (2026-09-04).** Sin esqueleto ni assets: la pose sale de la velocidad
+    interpolada, que el cliente ya tiene. La cuenta está aparte del render en
+    [avatar-pose.ts](apps/client/src/render/avatar-pose.ts), con 10 tests, porque
+    es lo único del render que se puede comprobar sin WebGL.
+  - El bloque único de piernas pasa a ser **dos piernas colgadas de la cadera**,
+    para que pivoten desde arriba y no desde el suelo.
+  - **La zancada avanza con la distancia recorrida, no con el tiempo**, que es lo
+    que evita que los pies patinen al ir despacio. El ciclo mide 168 unidades,
+    justo el doble de la zancada de los pasos audibles (T01), así que lo que se ve
+    y lo que se oye van al mismo ritmo en vez de cada uno por su lado. Hay test de
+    que la misma distancia deja la fase en el mismo sitio con `dt` grande o
+    pequeño.
+  - En el aire se recogen las piernas y **la fase se congela**, para que al
+    aterrizar la zancada siga donde estaba en lugar de pegar un salto.
+  - La inclinación es invariante al `yaw` (correr de frente es correr de frente
+    mire donde mire), y el alabeo sigue al lado hacia el que se desplaza. Con test.
+  - Verificado con un banco propio (`avatar-preview.html`) que pone los cuatro
+    casos en fila: parado, corriendo, de lado y en el aire. El alabeo lateral se
+    ve mal desde el perfil que usa el banco; esa parte la cubren los tests.
 
 - [ ] **T09. Bot con navegación**
   El bot persigue en línea recta y rodea cuando detecta que no avanza

@@ -28,6 +28,7 @@ import {
 } from '@neonduel/shared';
 
 import type { InterpolatedPlayer } from '../game/interpolation.js';
+import { avatarPose } from './avatar-pose.js';
 import { PALETTE, applyViewAngles } from './scene.js';
 
 const DUCK_SCALE = PLAYER_HEIGHT_DUCKED / PLAYER_HEIGHT_STANDING;
@@ -71,13 +72,25 @@ export class PlayerAvatar {
   private readonly shadow: Mesh;
   private readonly color: Color;
   private deathTimer = 0;
+  private readonly legs: [Group, Group];
+  /** Fase del ciclo de paso, que avanza con la distancia recorrida. */
+  private stridePhase = 0;
 
   constructor(color: number) {
     this.color = new Color(color);
 
     // Piernas, torso y cabeza: proporciones del hull de 72 unidades.
-    const legs = neonBox(22, 30, 18, this.color, 0.18);
-    legs.position.y = 15;
+    // Cada pierna cuelga de un grupo colocado en la cadera: girando el grupo,
+    // la pierna pivota desde arriba como es debido y no desde el suelo.
+    this.legs = [0, 1].map((i) => {
+      const hip = new Group();
+      hip.position.set(i === 0 ? -6 : 6, 30, 0);
+      const leg = neonBox(9, 30, 16, this.color, 0.18);
+      leg.position.y = -15;
+      hip.add(leg);
+      return hip;
+    }) as [Group, Group];
+
     const torso = neonBox(30, 26, 20, this.color, 0.3);
     torso.position.y = 43;
     this.head = neonBox(16, 16, 16, this.color, 0.5);
@@ -91,7 +104,7 @@ export class PlayerAvatar {
     visor.position.set(0, 1, -8.5);
     this.head.add(visor);
 
-    this.body.add(legs, torso, this.head);
+    this.body.add(...this.legs, torso, this.head);
     this.root.add(this.body);
 
     // Sombra de contacto: ayuda a juzgar la distancia y la altura.
@@ -132,6 +145,15 @@ export class PlayerAvatar {
       this.body.position.y = 0;
       this.setOpacity(1);
       this.shadow.visible = true;
+
+      // La pose se aplica despues de `applyViewAngles`: con el orden YXZ, la X
+      // inclina hacia delante y la Z alabea, las dos en los ejes del avatar.
+      const pose = avatarPose(this.stridePhase, player.vel, player.yaw, player.onGround, dt);
+      this.stridePhase = pose.phase;
+      this.body.rotation.x += pose.lean;
+      this.body.rotation.z += pose.roll;
+      this.legs[0].rotation.x = pose.legs[0];
+      this.legs[1].rotation.x = pose.legs[1];
     }
   }
 
