@@ -7,25 +7,32 @@
  * mismas reglas de arma. Su unica ventaja es no tener latencia, y se compensa
  * con un error de punteria y un tiempo de reaccion explicitos.
  *
- * La navegacion es deliberadamente simple (ir hacia el rival y desatascarse):
- * el mapa es una arena abierta y un navmesh completo no aportaria nada aqui.
+ * Se mueve por el grafo de navegacion del mapa (ver `navigation.ts`), asi que
+ * funciona igual en una arena abierta que en un mapa de pasillos. Apunta al
+ * rival mientras camina hacia otro sitio, como un jugador: el rumbo se traduce
+ * a las teclas de movimiento relativas a donde esta mirando.
  */
 
 import {
   BUTTON,
   type CollisionWorld,
+  type GameMap,
   MAX_PITCH,
+  type NavGraph,
   type PlayerState,
   TICK_DT,
   type UserCommand,
   type Vec3,
   angleDelta,
   clamp,
+  createCollisionWorld,
   createRandom,
   eyePosition,
+  findPath,
   getWeapon,
   hasLineOfSight,
   length2D,
+  navGraphOf,
   normalizeAngle,
   radToDeg,
   vec3,
@@ -69,11 +76,45 @@ export const BOT_DIFFICULTIES: Record<'easy' | 'normal' | 'hard', BotDifficulty>
 };
 
 /** Cada cuanto se comprueba si el bot esta progresando hacia su objetivo. */
-const PROGRESS_CHECK_SECONDS = 1;
 /** Unidades que debe acortar en ese intervalo para no considerarse atascado. */
 const MIN_PROGRESS_UNITS = 60;
+
+/** Cuanto tiene que moverse el objetivo para rehacer el camino. */
+const REPATH_DISTANCE = 160;
+
+/** Y cada cuanto se rehace de todos modos, por si el mapa cambio de mano. */
+const REPATH_SECONDS = 0.5;
+
+/**
+ * Radio para dar un waypoint por alcanzado. Menor que la separacion del grafo
+ * (32): con un radio mayor el bot corta camino entre nodos y se va desviando
+ * del pasillo, que es como acaba encajado en el costado de una escalera.
+ */
+const WAYPOINT_RADIUS = 22;
+
+/** Sin acercarse al waypoint durante este tiempo, se da por atascado. */
+const STUCK_SECONDS = 1;
+
+/**
+ * Traduce una direccion del mundo a los botones que la producen mirando a
+ * `yaw`. El umbral evita que una desviacion minima haga pulsar dos teclas y el
+ * bot avance en diagonal cuando queria ir recto.
+ */
+export const movementButtons = (yawDeg: number, dx: number, dy: number): number => {
+  const yaw = (yawDeg * Math.PI) / 180;
+  const adelante = dx * Math.cos(yaw) + dy * Math.sin(yaw);
+  const derecha = dx * Math.sin(yaw) - dy * Math.cos(yaw);
+
+  let buttons = 0;
+  if (adelante > MOVE_THRESHOLD) buttons |= BUTTON.FORWARD;
+  else if (adelante < -MOVE_THRESHOLD) buttons |= BUTTON.BACK;
+  if (derecha > MOVE_THRESHOLD) buttons |= BUTTON.RIGHT;
+  else if (derecha < -MOVE_THRESHOLD) buttons |= BUTTON.LEFT;
+  return buttons;
+};
+
+const MOVE_THRESHOLD = 0.25;
 /** Duracion de un rodeo lateral. */
-const AVOID_SECONDS = 1.4;
 
 export class BotController {
   private seq = 0;
@@ -84,21 +125,28 @@ export class BotController {
   private burstCooldown = 0;
   private strafeDirection: 1 | -1 = 1;
   private strafeTimer = 0;
-  private avoidTimer = 0;
-  private avoidDirection: 1 | -1 = 1;
-  private failedAvoids = 0;
   /** Distancia al rival en la ultima revision de progreso. */
-  private referenceDistance = Infinity;
-  private progressTimer = 0;
   private readonly random: () => number;
+  private readonly world: CollisionWorld;
+  private readonly nav: NavGraph;
+  /** Camino pendiente hacia el objetivo, en orden. */
+  private path: Vec3[] = [];
+  /** Punto para el que se calculo `path`: si el rival se mueve, se rehace. */
+  private pathTarget: Vec3 | null = null;
+  private repathTimer = 0;
+  /** Distancia al waypoint en la ultima revision, para detectar atascos. */
+  private waypointDistance = Infinity;
+  private stuckTimer = 0;
 
   constructor(
     readonly connectionId: number,
-    private readonly world: CollisionWorld,
+    map: GameMap,
     private readonly difficulty: BotDifficulty = BOT_DIFFICULTIES.normal,
     seed = 0xb07,
   ) {
     this.random = createRandom(seed);
+    this.world = createCollisionWorld(map);
+    this.nav = navGraphOf(map);
   }
 
   /** Genera el comando de este tick a partir del estado del mundo. */
@@ -182,9 +230,6 @@ export class BotController {
 
     if (visible && distance < 700) {
       // A tiro: mantener la distancia y moverse en lateral para ser dificil.
-      this.avoidTimer = 0;
-      this.progressTimer = 0;
-      this.referenceDistance = distance;
 
       buttons |= this.strafeDirection > 0 ? BUTTON.RIGHT : BUTTON.LEFT;
       if (distance < 250) buttons |= BUTTON.BACK;
@@ -195,40 +240,67 @@ export class BotController {
       return buttons;
     }
 
-    if (this.avoidTimer > 0) {
-      // Rodeo en curso: strafe puro y sostenido. Anadir "adelante" empujaria
-      // contra el obstaculo, y saltar quitaria el control que da el suelo.
-      this.avoidTimer -= TICK_DT;
-      buttons |= this.avoidDirection > 0 ? BUTTON.RIGHT : BUTTON.LEFT;
-      return buttons;
+    // Fuera de combate se va al rival por el camino que da la navegacion, no
+    // en linea recta: en un mapa de pasillos la linea recta es una pared.
+    return buttons | this.navigateTo(self, enemy.pos);
+  }
+
+  /**
+   * Avanza por el camino hacia `target` y devuelve los botones de movimiento.
+   *
+   * El rumbo no es la mirada: el bot apunta al rival mientras camina hacia otro
+   * lado, igual que un jugador, asi que la direccion se traduce a adelante,
+   * atras e izquierda/derecha respecto a donde esta mirando.
+   *
+   * Es publico a proposito: es la costura por la que los tests comprueban que
+   * llega a un punto cualquiera sin tener que montar una partida entera.
+   */
+  navigateTo(self: PlayerState, target: Vec3): number {
+    this.repathTimer -= TICK_DT;
+    const objetivoMovido =
+      !this.pathTarget ||
+      Math.hypot(target.x - this.pathTarget.x, target.y - this.pathTarget.y) > REPATH_DISTANCE;
+
+    if (this.path.length === 0 || objetivoMovido || this.repathTimer <= 0) {
+      this.path = findPath(this.nav, self.pos, target);
+      this.pathTarget = { ...target };
+      this.repathTimer = REPATH_SECONDS;
+      this.waypointDistance = Infinity;
+      this.stuckTimer = 0;
+      // El primer nodo suele ser el suelo bajo los pies: ir a el es no ir.
+      if (this.path.length > 1) this.path.shift();
     }
 
-    // Revision periodica de progreso: lo que importa no es haberse movido, sino
-    // haber *acortado* distancia. Deslizar pegado a una caja se mueve mucho y
-    // no acerca nada, y es justo el caso que hay que detectar.
-    this.progressTimer += TICK_DT;
-    if (this.progressTimer >= PROGRESS_CHECK_SECONDS) {
-      const gained = this.referenceDistance - distance;
-      if (gained < MIN_PROGRESS_UNITS) {
-        this.avoidTimer = AVOID_SECONDS;
-        this.failedAvoids += 1;
-        // Si rodear por un lado no funciona dos veces seguidas, se prueba el otro.
-        if (this.failedAvoids >= 2) {
-          this.avoidDirection = this.avoidDirection > 0 ? -1 : 1;
-          this.failedAvoids = 0;
-        }
-      } else {
-        this.failedAvoids = 0;
+    const waypoint = this.path[0];
+    if (!waypoint) return BUTTON.FORWARD;
+
+    const dx = waypoint.x - self.pos.x;
+    const dy = waypoint.y - self.pos.y;
+    const distancia = Math.hypot(dx, dy);
+    if (distancia < WAYPOINT_RADIUS) {
+      this.path.shift();
+      this.waypointDistance = Infinity;
+      this.stuckTimer = 0;
+      return this.navigateTo(self, target);
+    }
+
+    // Atasco: si en un segundo no se ha acercado al waypoint, es que hay algo
+    // en medio que el grafo no ve (el rival, sin ir mas lejos). Se salta ese
+    // punto en vez de empujar contra el.
+    this.stuckTimer += TICK_DT;
+    let extra = 0;
+    if (this.stuckTimer >= STUCK_SECONDS) {
+      if (distancia > this.waypointDistance - MIN_PROGRESS_UNITS) {
+        // Enganchado. Saltar resuelve el caso mas comun, quedarse trabado en el
+        // canto de un escalon, y rehacer el camino resuelve el resto.
+        extra = BUTTON.JUMP;
+        this.repathTimer = 0;
       }
-      this.referenceDistance = distance;
-      this.progressTimer = 0;
+      this.waypointDistance = distancia;
+      this.stuckTimer = 0;
     }
 
-    buttons |= BUTTON.FORWARD;
-    if (this.random() < 0.02) {
-      buttons |= this.strafeDirection > 0 ? BUTTON.RIGHT : BUTTON.LEFT;
-    }
-    return buttons;
+    return movementButtons(this.yaw, dx / distancia, dy / distancia) | extra;
   }
 
   /** Invierte la direccion pulsada para frenar de golpe, como un jugador. */

@@ -101,7 +101,7 @@ describe('emparejamiento', () => {
 
 describe('bot', () => {
   const bot = (skill: keyof typeof BOT_DIFFICULTIES = 'normal') =>
-    new BotController(2, ATRIUM_WORLD, BOT_DIFFICULTIES[skill], 1234);
+    new BotController(2, ATRIUM, BOT_DIFFICULTIES[skill], 1234);
 
   const players = () => {
     const self = createPlayer(2, 'BOT', vec3(-700, -300, 0));
@@ -229,10 +229,17 @@ describe('partida completa contra un bot', () => {
     const human = new MemoryConnection(server.allocateConnectionId());
     const session = server.joinBotMatch(human, 'hard');
 
-    // 90 segundos de juego a 64 Hz.
-    for (let i = 0; i < 64 * 90; i++) server.step();
+    // 90 segundos de juego a 64 Hz. Se mira si en algun momento hubo ganador y
+    // no como acaba el reloj: al terminar una partida empieza otra, asi que
+    // preguntar solo al final hace que el test dependa de lo rapido que sea el
+    // bot, que es justo lo que no se esta probando aqui.
+    let huboGanador = false;
+    for (let i = 0; i < 64 * 90; i++) {
+      server.step();
+      if (session.match.matchWinner !== null) huboGanador = true;
+    }
 
-    expect(session.match.matchWinner).not.toBeNull();
+    expect(huboGanador).toBe(true);
     expect(human.all('snapshot').length).toBeGreaterThan(1000);
     expect(session.map).toBe(ATRIUM);
   });

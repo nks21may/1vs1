@@ -7,6 +7,7 @@ export * from './constants.js';
 export * from './collision.js';
 export * from './movement.js';
 export * from './map.js';
+export * from './navigation.js';
 export * from './weapons.js';
 export * from './hitscan.js';
 export * from './player.js';

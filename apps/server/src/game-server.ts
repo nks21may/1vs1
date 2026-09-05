@@ -12,7 +12,6 @@ import {
   type GameMap,
   type MatchConfig,
   TICK_DT,
-  createCollisionWorld,
 } from '@neonduel/shared';
 
 import { BOT_DIFFICULTIES, BotController } from './bot.js';
@@ -85,7 +84,7 @@ export class GameServer {
       controller: new BotController(
         botConnection.id,
         // El bot navega el mismo mapa que se esta jugando, no el de por defecto.
-        createCollisionWorld(entry.session.map),
+        entry.session.map,
         BOT_DIFFICULTIES[skill],
         this.options.botSeed ?? (Date.now() & 0xffff),
       ),

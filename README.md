@@ -299,6 +299,7 @@ instancias haría falta un emparejador externo, que hoy no existe.
 - **Dos mapas**; la definición admite añadir más sin tocar el motor.
 - **El protocolo es JSON**: cómodo de depurar y suficiente para dos jugadores
   (~15 KB/s), pero un formato binario sería más eficiente con más jugadores.
-- **El bot no usa navegación por mallas**: persigue en línea recta y rodea cuando
-  detecta que no progresa. Le basta para ATRIUM; en CONDUIT, que es todo pasillos,
-  se le nota (ver T09 en `TODO.md`).
+- **El bot navega por una rejilla, no por una malla**: el grafo se deduce del
+  mapa con la misma colisión que usa la simulación, así que un mapa nuevo trae su
+  navegación sin anotar nada. Es suficiente para estos dos mapas; una malla de
+  navegación daría caminos más cortos y menos escalonados.

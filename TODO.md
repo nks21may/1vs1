@@ -367,13 +367,37 @@ así se pudra.
     casos en fila: parado, corriendo, de lado y en el aire. El alabeo lateral se
     ve mal desde el perfil que usa el banco; esa parte la cubren los tests.
 
-- [ ] **T09. Bot con navegación**
+- [x] **T09. Bot con navegación**
   El bot persigue en línea recta y rodea cuando detecta que no avanza
   ([bot.ts](apps/server/src/bot.ts)). Le basta para una arena abierta; con T07 se
   quedará atascado. Un grafo de puntos de navegación por mapa y búsqueda de camino
   lo arregla sin complicarlo mucho.
   - Hecho cuando: el bot llega a cualquier punto del mapa desde cualquier otro en
     un test, con un límite de tiempo razonable.
+  - **Hecho (2026-09-04).** [navigation.ts](packages/shared/src/navigation.ts)
+    construye un grafo de rejilla (32 unidades) barriendo el mapa con la **misma
+    colisión que usa la simulación**: un mapa nuevo trae su navegación sin que
+    nadie anote nada, que es la única forma de que no se quede desfasada cuando
+    alguien mueve una pared. La separación de 32 no es arbitraria: con 64, dos
+    nodos seguidos de una escalera se llevarían más de `STEP_SIZE` y las escaleras
+    quedarían marcadas como intransitables.
+  - El barrido también encuentra sitio de pie **encima** de los muros y del
+    monolito. Son posiciones válidas a las que no se llega, así que el grafo se
+    recorta a lo alcanzable desde los spawns: así es de una pieza por
+    construcción y no hay que preguntarse si un camino existe. Con test de que los
+    tejados quedan fuera y el balcón de ATRIUM dentro.
+  - El bot **apunta a un sitio y camina hacia otro**, como un jugador: el rumbo se
+    traduce a las teclas relativas a dónde mira. Eso permitió borrar el rodeo a
+    tientas (temporizadores de progreso y de esquiva) que existía antes.
+  - Dos ajustes salieron de verlo fallar, no de pensarlo: el radio de waypoint
+    tiene que ser **menor que la separación del grafo** (22 < 32) o el bot corta
+    camino entre nodos y acaba encajado en el costado de una escalera; y al
+    atascarse **salta**, que es lo que resuelve quedarse trabado en el canto de un
+    escalón.
+  - Verificado con física real, no solo sobre el grafo: el bot va de spawn a spawn
+    y a los cuatro extremos de cada mapa (y vuelve) en menos de 25 s; el peor caso
+    son 17. En una partida real en CONDUIT recorre 7278 unidades en 40 s, encuentra
+    al rival por los pasillos y le baja la vida.
 
 ---
 
