@@ -2,7 +2,12 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "./src",
-    "outDir": "./dist",
+    // `dist` es de esbuild: ahi va el bundle que se ejecuta y que copia la
+    // imagen de Docker. Si `tsc` emitiera tambien ahi, un `npm run typecheck`
+    // despues de un `npm run build` pisaria `dist/server.js` con la version sin
+    // empaquetar, que no arranca porque importa el codigo fuente del paquete
+    // compartido. El cliente ya separaba los dos por este mismo motivo.
+    "outDir": "./dist-types",
     "types": ["node"],
     "paths": {
       "@neonduel/shared": ["../../packages/shared/src/index.ts"]

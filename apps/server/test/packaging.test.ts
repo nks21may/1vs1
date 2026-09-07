@@ -58,6 +58,19 @@ describe('empaquetado en Docker', () => {
     expect(outfile?.endsWith('server.js')).toBe(true);
   });
 
+  it('tsc no emite en la carpeta donde esbuild deja el bundle', () => {
+    // `tsc --build` emitia en `dist`, el mismo sitio y el mismo nombre que el
+    // bundle: un `npm run typecheck` despues de un `npm run build` dejaba en
+    // `dist/server.js` la version sin empaquetar, que no arranca porque importa
+    // el codigo fuente del paquete compartido. Solo se notaba al ejecutarlo.
+    const outfile = /--outfile=(\S+)/.exec(buildScript)?.[1] ?? '';
+    const bundleDir = posix.dirname(outfile);
+
+    // El tsconfig lleva comentarios, asi que se leen sin parsear el JSON.
+    const outDir = /"outDir"\s*:\s*"([^"]+)"/.exec(read('apps/server/tsconfig.json'))?.[1] ?? '';
+    expect(posix.normalize(outDir)).not.toBe(posix.normalize(bundleDir));
+  });
+
   it('deja el cliente donde el servidor lo busca', () => {
     // La ruta relativa esta escrita una sola vez, en la constante CLIENT_DIST.
     const relative = /'(\.\.\/[^']*client\/dist)'/.exec(serverSource)?.[1];
