@@ -172,10 +172,66 @@ class TestClient {
 }
 
 describe('HTTP', () => {
-  it('responde a la sonda de salud', async () => {
+  const health = async (): Promise<Record<string, unknown>> => {
     const response = await fetch(`http://127.0.0.1:${server.port}/health`);
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ ok: true });
+    return (await response.json()) as Record<string, unknown>;
+  };
+
+  it('responde a la sonda de salud', async () => {
+    const info = await health();
+
+    expect(info).toMatchObject({ ok: true, version: PROTOCOL_VERSION });
+    for (const campo of ['sessions', 'matches', 'players', 'reconnecting']) {
+      expect(typeof info[campo]).toBe('number');
+    }
+  });
+
+  it('mide el tick que el bucle consigue de verdad', { timeout: 15000 }, async () => {
+    // La primera ventana tarda un segundo en cerrarse, y hasta entonces la
+    // respuesta honesta es que no se sabe.
+    const deadline = Date.now() + 10000;
+    let tick: unknown = null;
+    while (tick === null && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      tick = (await health()).tick;
+    }
+
+    // Margen ancho a proposito: en una maquina cargada el bucle baja, y el
+    // test comprueba que la medida es real, no que la maquina vaya sobrada.
+    expect(tick).toBeGreaterThan(40);
+    expect(tick).toBeLessThan(80);
+  });
+
+  it('cuenta los jugadores conectados y las partidas en marcha', async () => {
+    const antes = await health();
+
+    // Cada uno en su partida contra el bot: son privadas, asi que el hueco que
+    // deja el que se cae no se lo queda un test posterior.
+    const a = new TestClient('?bot=easy');
+    const b = new TestClient('?bot=easy');
+    await Promise.all([a.open(), b.open()]);
+    a.join('SONDA_A');
+    b.join('SONDA_B');
+    await a.waitFor('welcome');
+    await b.waitFor('welcome');
+    await a.waitFor('snapshot');
+
+    const durante = await health();
+    // Dos jugadores y dos partidas: los bots no cuentan como gente conectada.
+    expect(durante.players).toBe(Number(antes.players) + 2);
+    expect(durante.matches).toBe(Number(antes.matches) + 2);
+
+    // Al caerse uno deja de contar como conectado, pero su partida sigue viva
+    // mientras se le guarda el sitio.
+    a.drop();
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const caido = await health();
+    expect(caido.players).toBe(Number(antes.players) + 1);
+    expect(caido.reconnecting).toBe(Number(antes.reconnecting) + 1);
+    expect(caido.matches).toBe(Number(antes.matches) + 2);
+
+    b.leave();
   });
 
   it('no deja salir del directorio del cliente', async () => {

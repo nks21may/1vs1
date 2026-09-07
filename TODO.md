@@ -585,7 +585,7 @@ así se pudra.
     `Espacio`**, comprobado sobre los comandos que salen por el WebSocket; todo
     sigue ahí tras recargar la página, y «Teclas de fábrica» lo devuelve.
 
-- [ ] **T15. Docker y observabilidad** — la imagen ya está (2026-09-04); falta la
+- [x] **T15. Docker y observabilidad** — la imagen ya está (2026-09-04); falta la
       observabilidad.
       `Dockerfile`, `compose.yaml` y [DEPLOY.md](DEPLOY.md) construyen la imagen en
       x86_64 y en ARM64 y la dejan lista para servir detrás de un túnel o un proxy.
@@ -594,6 +594,32 @@ así se pudra.
       teórico, no el que el bucle consigue de verdad.
   - Hecho cuando: `/health` informa del tick real medido, de los jugadores
     conectados y de las partidas activas.
+  - **Hecho (2026-09-05).** `/health` devuelve `tick`, `sessions`, `matches`,
+    `players` y `reconnecting`, documentados en [DEPLOY.md](DEPLOY.md) con qué
+    mirar cuando algo va mal.
+  - **El tick se mide por ventanas cerradas de un segundo, no por la distancia
+    entre ticks.** El bucle recupera el retraso simulando varios de golpe, todos
+    con la misma marca de tiempo: medir entre marcas sería dividir por cero. Se
+    cuentan intervalos y no marcas, o una ventana de un segundo a 64 Hz tendría
+    65 y la medida saldría siempre un tick larga.
+  - **Mientras no hay una ventana entera, `tick` es `null` y no `0`.** Un cero
+    diría que el bucle está parado, que es una afirmación muy distinta de
+    «todavía no lo sé».
+  - **Los bots no cuentan como jugadores** y una sesión esperando rival no cuenta
+    como partida en marcha: si contaran, un servidor vacío parecería lleno y no
+    habría forma de saber si hay trabajo de verdad.
+  - **Decisión: el `welcome` sigue anunciando 64 Hz.** El enunciado lo señalaba
+    como parte del problema, pero no es lo mismo: la simulación es de paso fijo
+    y su ritmo _es_ 64: lo que varía es cuántos pasos consigue dar el bucle por
+    segundo, y eso es una propiedad de la máquina, no del protocolo. Ponerlo en
+    el `welcome` haría creer al cliente que el tamaño del paso cambia.
+  - El medidor no toca ningún reloj: recibe las marcas de tiempo, así que sus
+    tests son instantáneos y no dependen de la carga de la máquina.
+  - Verificado contra el servidor real: recién arrancado y vacío, con una partida
+    contra el bot (`players` 1, no 2), con otro cliente esperando rival
+    (`sessions` 2 pero `matches` 1), con uno caído (`players` baja,
+    `reconnecting` sube, la partida sigue) y tras irse el otro. El `tick` medido
+    osciló entre 63,4 y 64,2.
 
 - [ ] **T16. Rendimiento del render**
       Cada brush es una malla ([world.ts](apps/client/src/render/world.ts)). Con ~70

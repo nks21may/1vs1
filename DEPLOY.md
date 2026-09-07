@@ -12,6 +12,7 @@ lo publique lo que ya tengas delante.
   - [Si prefieres pasar por nginx](#si-prefieres-pasar-por-nginx)
 - [5. Publicarlo sin túnel](#5-publicarlo-sin-túnel)
 - [Mantenimiento](#mantenimiento)
+  - [Qué mirar en `/health`](#qué-mirar-en-health)
 - [Cuando algo no responde](#cuando-algo-no-responde)
 
 ---
@@ -49,7 +50,7 @@ así que tras un reinicio de la máquina el juego vuelve solo.
 git clone https://github.com/nks21may/1vs1.git neonduel
 cd neonduel
 docker compose up -d --build
-curl -s localhost:8090/health     # {"ok":true,"sessions":0,"version":5}
+curl -s localhost:8090/health     # {"ok":true,"version":5,"tick":64,...}
 ```
 
 > Si el repositorio es privado, o prefieres no darle acceso a la máquina, copia
@@ -172,9 +173,37 @@ El estado vive en memoria: al recrear el contenedor se cierran las partidas
 abiertas y los jugadores tienen que volver a emparejarse. Como no hay nada que
 persistir, tampoco hay copias de seguridad que hacer.
 
-Consumo: una partida son unos 15 KB/s en cada sentido, así que el límite de
+Consumo: una partida son unos 12 KB/s de bajada por jugador, así que el límite de
 salida del _always free_ (10 TB al mes) no se acerca ni jugando sin parar. La
 imagen ocupa ~230 MB y el proceso ronda los 80 MB de memoria.
+
+### Qué mirar en `/health`
+
+```json
+{
+  "ok": true,
+  "version": 5,
+  "tick": 63.9,
+  "sessions": 2,
+  "matches": 1,
+  "players": 3,
+  "reconnecting": 0
+}
+```
+
+| Campo          | Qué dice                                                                                                                                     |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tick`         | Ticks por segundo que el bucle consigue **de verdad**, medidos sobre el último segundo. `null` durante el primer segundo de vida del proceso |
+| `sessions`     | Partidas existentes, incluidas las que esperan rival                                                                                         |
+| `matches`      | De esas, las que se están jugando                                                                                                            |
+| `players`      | Personas con el socket vivo. Los bots no cuentan                                                                                             |
+| `reconnecting` | Personas caídas a las que se les guarda el sitio unos segundos                                                                               |
+
+**`tick` es la métrica que importa.** El servidor simula a paso fijo, así que el
+tamaño del paso siempre es el mismo: lo que puede fallar es cuántos consigue dar
+por segundo. Si baja de 64 de forma sostenida, la máquina se está quedando corta
+y los jugadores reciben menos instantáneas de las que su cliente espera, sin que
+nada aparezca en los logs.
 
 ## Cuando algo no responde
 
@@ -186,6 +215,7 @@ imagen ocupa ~230 MB y el proceso ronda los 80 MB de memoria.
 | Sale el 404 del túnel                         | La regla quedó detrás del `http_status:404`, o el hostname no coincide   |
 | Carga la página pero se queda en «conectando» | Algo en medio no deja pasar la actualización a WebSocket (mira el nginx) |
 | «Versión de protocolo incompatible»           | Cliente y servidor de compilaciones distintas; recompila la imagen       |
+| El `tick` de `/health` baja de 60             | La máquina no da para el bucle: mira la CPU antes de culpar a la red     |
 
 Si expones el puerto directamente y no responde desde fuera, además de la regla
 de la lista de seguridad está el cortafuegos local: la imagen de Ubuntu de Oracle

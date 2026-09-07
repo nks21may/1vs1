@@ -71,6 +71,22 @@ export class GameServer {
   }
 
   /**
+   * Jugadores con el socket vivo. Los bots no cuentan: son parte de la partida,
+   * no gente conectada, y sumarlos haria que un servidor vacio pareciera lleno.
+   */
+  get playerCount(): number {
+    return this.sessionByConnection.size - this.pending.size;
+  }
+
+  /**
+   * Partidas en marcha. Una sesion que espera rival existe pero no se esta
+   * jugando, y para saber si el servidor tiene trabajo esa es la diferencia.
+   */
+  get activeMatchCount(): number {
+    return this.sessions.filter((entry) => entry.session.match.phase !== 'waiting').length;
+  }
+
+  /**
    * Ticket nuevo para una conexion. Es opaco a proposito: el cliente solo lo
    * guarda y lo repite, y adivinarlo no sirve porque solo vale mientras su
    * jugador este caido.

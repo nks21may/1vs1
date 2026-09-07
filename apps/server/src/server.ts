@@ -18,6 +18,7 @@ import { PROTOCOL_VERSION, getMap, parseClientMessage, sanitizeName } from '@neo
 
 import type { Connection } from './connection.js';
 import { type BotSkill, GameServer, TICK_INTERVAL } from './game-server.js';
+import { TickMeter } from './metrics.js';
 
 /** Un mensaje legitimo no llega a 4 KB; mas que eso es ruido o un ataque. */
 const MAX_MESSAGE_BYTES = 4096;
@@ -92,13 +93,28 @@ export const startServer = async (options: StartOptions = {}): Promise<ServerHan
   const clientDist = options.clientDist ?? CLIENT_DIST;
 
   const game = new GameServer();
+  // Se declara aqui y no junto al bucle porque `/health` tambien lo lee.
+  const ticks = new TickMeter();
 
   const serveStatic = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const url = new URL(req.url ?? '/', 'http://localhost');
 
     if (url.pathname === '/health') {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, sessions: game.sessionCount, version: PROTOCOL_VERSION }));
+      res.end(
+        JSON.stringify({
+          ok: true,
+          version: PROTOCOL_VERSION,
+          // Ticks por segundo que el bucle consigue de verdad, no los 64
+          // nominales. `null` durante el primer segundo, que no es lo mismo
+          // que cero.
+          tick: ticks.hz,
+          sessions: game.sessionCount,
+          matches: game.activeMatchCount,
+          players: game.playerCount,
+          reconnecting: game.pendingCount,
+        }),
+      );
       return;
     }
 
@@ -234,6 +250,7 @@ export const startServer = async (options: StartOptions = {}): Promise<ServerHan
       while (accumulator >= TICK_INTERVAL) {
         accumulator -= TICK_INTERVAL;
         game.step();
+        ticks.record(now);
       }
     },
     Math.max(1, Math.floor(TICK_INTERVAL / 2)),

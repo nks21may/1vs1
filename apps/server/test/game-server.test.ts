@@ -100,6 +100,47 @@ describe('emparejamiento', () => {
   });
 });
 
+describe('cuentas para observabilidad', () => {
+  it('cuenta a los humanos conectados, no a los bots', () => {
+    const server = new GameServer({ matchConfig: config });
+    expect(server.playerCount).toBe(0);
+
+    const solo = new MemoryConnection(server.allocateConnectionId());
+    server.joinBotMatch(solo);
+    // La partida tiene dos participantes, pero conectado solo hay uno.
+    expect(server.sessionOf(solo.id)!.playerCount).toBe(2);
+    expect(server.playerCount).toBe(1);
+  });
+
+  it('quien esta caido deja de contar como conectado', () => {
+    const server = new GameServer({ matchConfig: config });
+    const a = new MemoryConnection(server.allocateConnectionId());
+    const b = new MemoryConnection(server.allocateConnectionId());
+    server.joinMatch(a);
+    server.joinMatch(b);
+    expect(server.playerCount).toBe(2);
+
+    server.disconnect(a.id);
+    expect(server.playerCount).toBe(1);
+    expect(server.pendingCount).toBe(1);
+
+    server.reconnect(a.id, new MemoryConnection(a.id));
+    expect(server.playerCount).toBe(2);
+  });
+
+  it('una sesion esperando rival no es una partida en marcha', () => {
+    const server = new GameServer({ matchConfig: config });
+    const a = new MemoryConnection(server.allocateConnectionId());
+    server.joinMatch(a);
+
+    expect(server.sessionCount).toBe(1);
+    expect(server.activeMatchCount).toBe(0);
+
+    server.joinMatch(new MemoryConnection(server.allocateConnectionId()));
+    expect(server.activeMatchCount).toBe(1);
+  });
+});
+
 describe('reconexion', () => {
   const GRACE_TICKS = RECONNECT_GRACE_SECONDS * TICK_RATE;
 

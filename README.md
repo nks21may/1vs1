@@ -329,7 +329,7 @@ la prosa, solo alinea tablas y normaliza el énfasis.
 
 ## Tests
 
-467 tests, ~98% de cobertura sobre la simulación y el servidor.
+478 tests, ~98% de cobertura sobre la simulación y el servidor.
 
 ```
 packages/shared/test/   Física, colisión, armas, hitscan, reglas, protocolo, mapa
