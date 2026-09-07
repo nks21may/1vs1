@@ -121,14 +121,44 @@ const tileFloorTexture = (material: MeshStandardMaterial, sizeX: number, sizeZ: 
   material.map.needsUpdate = true;
 };
 
+type Side = 'cool' | 'warm' | 'neutral';
+
+const sideOf = (x: number): Side =>
+  x < -SIDE_THRESHOLD ? 'cool' : x > SIDE_THRESHOLD ? 'warm' : 'neutral';
+
+/**
+ * Fusiona las piezas en una sola geometria y devuelve la malla, o `null` si no
+ * habia nada. Las piezas se liberan: ya viven dentro de la fusionada.
+ */
+const mergedMesh = (geometries: BufferGeometry[], material: MeshStandardMaterial): Mesh | null => {
+  if (geometries.length === 0) return null;
+
+  // Los tipos prometen una geometria siempre, pero `mergeGeometries` devuelve
+  // `null` si los atributos de las piezas no encajan.
+  const merged = mergeGeometries(geometries, false) as BufferGeometry | null;
+  for (const geometry of geometries) geometry.dispose();
+  return merged ? new Mesh(merged, material) : null;
+};
+
+/**
+ * Malla estatica del mapa, fusionada por material.
+ *
+ * Un brush es una caja, pero no es una malla: todas las que comparten material
+ * viajan a la GPU como una sola. Con una malla por caja, el coste de dibujar el
+ * mapa crece con el numero de brushes aunque la geometria sea trivial, y eso es
+ * lo que le pone techo al tamano de un mapa.
+ *
+ * Lo que se pierde es el descarte por frustum caja a caja: al ser una sola
+ * malla, o entra toda o no entra ninguna. En una arena que cabe casi entera en
+ * pantalla eso no estaba descartando nada, asi que no se pierde nada.
+ */
 export const buildWorldMesh = (map: GameMap): Group => {
   const group = new Group();
   const materials = new Map<string, MeshStandardMaterial>();
-  const edgesBySide: Record<'cool' | 'warm' | 'neutral', BufferGeometry[]> = {
-    cool: [],
-    warm: [],
-    neutral: [],
-  };
+  /** Cajas pendientes de fusionar, agrupadas por material. */
+  const bodies = new Map<string, BufferGeometry[]>();
+  const strips = new Map<Side, BufferGeometry[]>();
+  const edgesBySide: Record<Side, BufferGeometry[]> = { cool: [], warm: [], neutral: [] };
 
   for (const brush of map.brushes) {
     const { sizeX, sizeY, sizeZ, center } = brushBox(brush);
@@ -141,10 +171,16 @@ export const buildWorldMesh = (map: GameMap): Group => {
     }
     if (key === 'floor') tileFloorTexture(material, sizeX, sizeZ);
 
+    // La caja se coloca moviendo su geometria, no la malla: una vez fusionadas
+    // comparten una sola malla y ya no tienen posicion propia.
     const geometry = new BoxGeometry(sizeX, sizeY, sizeZ);
-    const mesh = new Mesh(geometry, material);
-    mesh.position.copy(center);
-    group.add(mesh);
+    geometry.translate(center.x, center.y, center.z);
+
+    const pieces = bodies.get(key) ?? [];
+    pieces.push(geometry);
+    bodies.set(key, pieces);
+
+    const side = sideOf(center.x);
 
     // Tira luminosa en el canto superior de los volumenes que se usan como
     // cobertura. Ademas de la estetica, es informacion: marca a que altura
@@ -152,55 +188,55 @@ export const buildWorldMesh = (map: GameMap): Group => {
     // Solo en las coberturas: en las plataformas grandes (balcones, torres de
     // spawn) la tira ocupa media pantalla y el brillo tapa el juego.
     if (key === 'cover') {
-      const side =
-        center.x < -SIDE_THRESHOLD ? 'cool' : center.x > SIDE_THRESHOLD ? 'warm' : 'neutral';
-      const strip = new Mesh(
-        new BoxGeometry(sizeX + 1, 1.2, sizeZ + 1),
-        stripMaterial(side, materials),
-      );
-      strip.position.set(center.x, center.y + sizeY / 2, center.z);
-      group.add(strip);
+      const strip = new BoxGeometry(sizeX + 1, 1.2, sizeZ + 1);
+      strip.translate(center.x, center.y + sizeY / 2, center.z);
+      const sidePieces = strips.get(side) ?? [];
+      sidePieces.push(strip);
+      strips.set(side, sidePieces);
     }
 
-    // Las aristas se acumulan y se fusionan al final: un unico LineSegments por
-    // color en lugar de uno por caja.
-    const edges = new EdgesGeometry(geometry, 20);
-    edges.translate(center.x, center.y, center.z);
-
-    const side =
-      center.x < -SIDE_THRESHOLD ? 'cool' : center.x > SIDE_THRESHOLD ? 'warm' : 'neutral';
-    edgesBySide[side].push(edges);
+    // Las aristas tambien se acumulan: un unico LineSegments por color en lugar
+    // de uno por caja.
+    edgesBySide[side].push(new EdgesGeometry(geometry, 20));
   }
 
-  const edgeColors: Record<'cool' | 'warm' | 'neutral', number> = {
+  for (const [key, geometries] of bodies) {
+    const material = materials.get(key);
+    if (!material) continue;
+    const mesh = mergedMesh(geometries, material);
+    if (mesh) group.add(mesh);
+  }
+
+  for (const [side, geometries] of strips) {
+    const mesh = mergedMesh(geometries, stripMaterial(side, materials));
+    if (mesh) group.add(mesh);
+  }
+
+  const edgeColors: Record<Side, number> = {
     cool: PALETTE.edgeCool,
     warm: PALETTE.edgeWarm,
     neutral: 0x3d5170,
   };
 
-  const disposables: BufferGeometry[] = [];
-
   for (const side of ['cool', 'warm', 'neutral'] as const) {
     const geometries = edgesBySide[side];
     if (geometries.length === 0) continue;
 
-    // Los tipos prometen una geometria siempre, pero `mergeGeometries` devuelve
-    // `null` si los atributos de las piezas no encajan.
     const merged = mergeGeometries(geometries, false) as BufferGeometry | null;
     for (const geometry of geometries) geometry.dispose();
     if (!merged) continue;
 
-    disposables.push(merged);
-    const lines = new LineSegments(
-      merged,
-      new LineBasicMaterial({
-        color: new Color(edgeColors[side]),
-        transparent: true,
-        opacity: 0.85,
-        fog: true,
-      }),
+    group.add(
+      new LineSegments(
+        merged,
+        new LineBasicMaterial({
+          color: new Color(edgeColors[side]),
+          transparent: true,
+          opacity: 0.85,
+          fog: true,
+        }),
+      ),
     );
-    group.add(lines);
   }
 
   return group;

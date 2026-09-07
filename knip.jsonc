@@ -4,7 +4,12 @@
     "apps/client": {
       // Bancos de pruebas del render y del audio: son puntos de entrada de sus
       // paginas `*-preview.html`, no codigo muerto.
-      "entry": ["src/aa-preview.ts", "src/audio-preview.ts", "src/avatar-preview.ts"],
+      "entry": [
+        "src/aa-preview.ts",
+        "src/audio-preview.ts",
+        "src/avatar-preview.ts",
+        "src/world-preview.ts",
+      ],
     },
   },
   "rules": {

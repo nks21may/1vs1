@@ -621,11 +621,47 @@ así se pudra.
     `reconnecting` sube, la partida sigue) y tras irse el otro. El `tick` medido
     osciló entre 63,4 y 64,2.
 
-- [ ] **T16. Rendimiento del render**
+- [x] **T16. Rendimiento del render**
       Cada brush es una malla ([world.ts](apps/client/src/render/world.ts)). Con ~70
       va sobrado, pero un mapa mayor pediría fusionar la geometría estática por
       material. Medir primero con las herramientas del navegador.
   - Hecho cuando: hay una medida antes y después en un mapa grande de prueba.
+  - **Hecho (2026-09-05).** La geometría estática se fusiona por material: las
+    cajas se colocan moviendo su geometría, no la malla, y todas las que
+    comparten material viajan a la GPU como una sola. Las tiras luminosas de las
+    coberturas se fusionan por lado, y las aristas ya lo estaban.
+  - **Medido con un banco propio** (`world-preview.html`), que construye el mismo
+    mapa de las dos maneras sobre la misma escena, la misma cámara y el mismo
+    frame:
+
+    | Mapa            | brushes | draw calls | objetos en escena | ms/frame | build      |
+    | --------------- | ------- | ---------- | ----------------- | -------- | ---------- |
+    | ATRIUM          | 66      | 66 → 12    | 67 → 14           | 0,1 → 0  | 0,3 → 1,6  |
+    | CONDUIT         | 26      | 26 → 9     | 27 → 11           | 0 → 0    | 0,2 → 1,1  |
+    | sintético 22×22 | 484     | 484 → 12   | 485 → 14          | 0,7 → 0  | 2,7 → 12,1 |
+    | sintético 40×40 | 1600    | 1600 → 12  | 1601 → 14         | 2,4 → 0  | 9,6 → 43   |
+
+  - **Lo que cambia no es el número, es de qué depende.** Las llamadas de dibujo
+    pasan a depender de cuántos materiales tiene el mapa, no de cuántos brushes:
+    doce con 484 cajas y doce con 1600. Eso es lo que le quita el techo al tamaño
+    de un mapa.
+  - **El «antes» del banco es optimista a propósito**: solo dibuja los cuerpos,
+    mientras que el «después» incluye además las tiras de las coberturas y las
+    aristas. La versión anterior de verdad tenía una malla más por cobertura, así
+    que la diferencia real era algo mayor que la medida.
+  - **Los milisegundos por fotograma no son la medida buena** y están ahí como
+    referencia relativa: las capturas corren sobre SwiftShader (render por
+    software), donde el coste por llamada pesa más que en una GPU. Las llamadas
+    de dibujo y los triángulos, en cambio, no dependen del hardware.
+  - **Se paga en tiempo de construcción**: fusionar 1600 cajas cuesta 43 ms
+    frente a 9,6. Se paga una vez al cargar el mapa, no en cada fotograma.
+  - **Y se pierde el descarte por frustum caja a caja**: al ser una sola malla, o
+    entra toda o no entra ninguna. En una arena que cabe casi entera en pantalla
+    no estaba descartando nada; en un mapa de verdad grande habría que trocear la
+    fusión por zonas.
+  - Verificado en el juego real: ATRIUM y CONDUIT se ven exactamente igual que
+    antes --escaleras, coberturas con su tira, aristas de neón, los dos lados con
+    su color-- y sin errores de consola.
 
 ---
 
