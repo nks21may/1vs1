@@ -9,8 +9,9 @@
 
 import {
   PROTOCOL_VERSION,
+  SnapshotDecoder,
   type ServerMessage,
-  type SnapshotMessage,
+  type FullSnapshot,
   type UserCommand,
   type WelcomeMessage,
   parseServerMessage,
@@ -20,7 +21,7 @@ export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'closed' | 
 
 export interface NetHandlers {
   onWelcome(message: WelcomeMessage): void;
-  onSnapshot(message: SnapshotMessage, receivedAt: number): void;
+  onSnapshot(message: FullSnapshot, receivedAt: number): void;
   onStatus(status: ConnectionStatus, detail?: string): void;
 }
 
@@ -48,6 +49,7 @@ export class NetClient {
    * una latencia declarada, sino un tick que el mismo produjo.
    */
   private lastSnapshotTick = 0;
+  private readonly snapshots = new SnapshotDecoder();
   /** Ticket para volver a la partida en curso si se cae el socket. */
   private token: string | null = null;
   /** A donde reconectar. Se guarda del `connect` para poder repetirlo. */
@@ -80,6 +82,7 @@ export class NetClient {
     if (!target) return;
 
     this.setStatus('connecting');
+    this.snapshots.reset();
     const socket = new WebSocket(target.url);
     this.socket = socket;
 
@@ -154,6 +157,7 @@ export class NetClient {
     this.recentCommands = [];
     this.rttSamples = [];
     this.lastSnapshotTick = 0;
+    this.snapshots.reset();
     this.token = null;
     this.target = null;
   }
@@ -174,10 +178,15 @@ export class NetClient {
         this.reconnectAttempts = 0;
         this.handlers.onWelcome(message);
         break;
-      case 'snapshot':
+      case 'snapshot': {
+        const full = this.snapshots.decode(message);
+        // Sin poder reconstruirla no se reconoce el tick: reconocerlo diria al
+        // servidor que se tiene un estado que en realidad no se tiene.
+        if (!full) break;
         this.lastSnapshotTick = message.tick;
-        this.handlers.onSnapshot(message, performance.now());
+        this.handlers.onSnapshot(full, performance.now());
         break;
+      }
       case 'pong': {
         const sample = performance.now() - message.time;
         // Mediana de las ultimas medidas: ignora los picos sueltos, que si no

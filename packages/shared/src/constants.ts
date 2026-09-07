@@ -117,6 +117,12 @@ export const LAG_COMPENSATION_HISTORY_TICKS = 32;
 export const LATENCY_SAMPLES = TICK_RATE;
 /** Techo de una medida suelta. Por encima la conexion ya no es jugable. */
 export const MAX_LATENCY_SAMPLE_MS = 1000;
+/**
+ * Cada cuantos ticks se manda una instantanea completa en vez de diferencial.
+ * Una por segundo: cuesta un 1,6% del trafico y hace que cualquier desajuste se
+ * cure solo en vez de quedarse para el resto de la partida.
+ */
+export const SNAPSHOT_KEYFRAME_TICKS = TICK_RATE;
 /** Tiempo que se guarda el sitio de un jugador cuyo socket se ha caido. */
 export const RECONNECT_GRACE_SECONDS = 10;
 /** Longitud maxima del ticket de reconexion, para no tragar cadenas enormes. */

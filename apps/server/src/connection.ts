@@ -6,7 +6,7 @@
  * abrir un solo socket.
  */
 
-import type { ServerMessage } from '@neonduel/shared';
+import { SnapshotDecoder, type FullSnapshot, type ServerMessage } from '@neonduel/shared';
 
 export interface Connection {
   readonly id: number;
@@ -51,5 +51,21 @@ export class MemoryConnection implements Connection {
   /** Todos los mensajes de un tipo. */
   all<T extends ServerMessage['t']>(type: T): Extract<ServerMessage, { t: T }>[] {
     return this.sent.filter((m) => m.t === type) as Extract<ServerMessage, { t: T }>[];
+  }
+
+  /**
+   * Las instantaneas ya reconstruidas, como las ve un cliente: por el cable
+   * casi todas son diferencias y solo traen lo que ha cambiado.
+   */
+  fullSnapshots(): FullSnapshot[] {
+    const decoder = new SnapshotDecoder();
+    return this.all('snapshot')
+      .map((message) => decoder.decode(message))
+      .filter((snapshot): snapshot is FullSnapshot => snapshot !== null);
+  }
+
+  /** La ultima instantanea reconstruida. */
+  lastFull(): FullSnapshot | undefined {
+    return this.fullSnapshots().at(-1);
   }
 }

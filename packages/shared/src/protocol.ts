@@ -11,11 +11,12 @@
  */
 
 import { MAX_COMMANDS_PER_PACKET, MAX_PITCH, MAX_TOKEN_LENGTH, TICK_DT } from './constants.js';
+import type { PlayerDelta } from './delta.js';
 import type { MatchPhase, RoundEndReason } from './match.js';
 import type { UserCommand } from './movement.js';
 import { WEAPON_SLOTS, type HitGroup, type WeaponId } from './weapons.js';
 
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 // --- Cliente -> Servidor ---
 
@@ -190,7 +191,18 @@ export interface SnapshotMessage {
   time: number;
   /** Ultimo comando del destinatario que el servidor ha procesado. */
   ack: number;
-  players: PlayerSnapshot[];
+  /**
+   * Tick del que esta instantanea es diferencia.
+   *
+   * Si falta, `players` viene entero y se puede aplicar sin nada previo. Si
+   * esta, `players` solo trae lo que ha cambiado desde ese tick, que es siempre
+   * el mensaje inmediatamente anterior (el transporte es TCP: ni se pierden ni
+   * se adelantan). Ver [delta.ts](delta.ts).
+   */
+  base?: number;
+  players: PlayerDelta[];
+  /** Jugadores que han dejado la partida. Solo en las diferencias. */
+  gone?: number[];
   phase: MatchPhase;
   /** Segundos restantes de la fase actual. */
   phaseTime: number;
@@ -202,6 +214,14 @@ export interface PongMessage {
   t: 'pong';
   time: number;
   server: number;
+}
+
+/**
+ * Instantanea ya reconstruida: la que usa el juego, con todos los jugadores
+ * completos. Por el cable viaja `SnapshotMessage`, que puede ser diferencial.
+ */
+export interface FullSnapshot extends Omit<SnapshotMessage, 'players' | 'base' | 'gone'> {
+  players: PlayerSnapshot[];
 }
 
 export type ServerMessage = WelcomeMessage | SnapshotMessage | PongMessage;

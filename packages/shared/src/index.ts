@@ -14,3 +14,4 @@ export * from './player.js';
 export * from './lagcomp.js';
 export * from './match.js';
 export * from './protocol.js';
+export * from './delta.js';

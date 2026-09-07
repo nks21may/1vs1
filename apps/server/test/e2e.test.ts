@@ -13,9 +13,10 @@ import WebSocket from 'ws';
 import {
   BUTTON,
   PROTOCOL_VERSION,
+  SnapshotDecoder,
   TICK_DT,
+  type FullSnapshot,
   type ServerMessage,
-  type SnapshotMessage,
   type WelcomeMessage,
 } from '@neonduel/shared';
 
@@ -38,12 +39,21 @@ const textOf = (raw: WebSocket.RawData): string => {
   return Buffer.from(raw).toString('utf8');
 };
 
+/**
+ * Lo que devuelve una espera. Las instantaneas se guardan ya reconstruidas: por
+ * el cable casi todas son diferencias y solo traen lo que ha cambiado.
+ */
+type Received<T extends ServerMessage['t']> = T extends 'snapshot'
+  ? FullSnapshot
+  : Extract<ServerMessage, { t: T }>;
+
 /** Cliente de pruebas: acumula lo recibido y expone esperas por tipo. */
 class TestClient {
   readonly messages: ServerMessage[] = [];
   private readonly socket: WebSocket;
   private seq = 0;
   private lastTick = 0;
+  private readonly decoder = new SnapshotDecoder();
   /** Ticket de reconexion, tal y como lo guardaria el navegador. */
   token: string | undefined;
 
@@ -51,11 +61,17 @@ class TestClient {
     this.socket = new WebSocket(`ws://127.0.0.1:${server.port}/${query}`);
     this.socket.on('message', (data) => {
       const message = JSON.parse(textOf(data)) as ServerMessage;
+      if (message.t === 'welcome') this.token = message.token;
+      if (message.t !== 'snapshot') {
+        this.messages.push(message);
+        return;
+      }
+
       // Igual que el navegador: el ultimo tick visto viaja en cada paquete de
       // entrada, y es con el con lo que el servidor mide la latencia.
-      if (message.t === 'snapshot') this.lastTick = message.tick;
-      if (message.t === 'welcome') this.token = message.token;
-      this.messages.push(message);
+      this.lastTick = message.tick;
+      const full = this.decoder.decode(message);
+      if (full) this.messages.push(full);
     });
   }
 
@@ -87,12 +103,9 @@ class TestClient {
   }
 
   /** Espera al siguiente mensaje del tipo indicado. */
-  async waitFor<T extends ServerMessage['t']>(
-    type: T,
-    timeoutMs = 3000,
-  ): Promise<Extract<ServerMessage, { t: T }>> {
+  async waitFor<T extends ServerMessage['t']>(type: T, timeoutMs = 3000): Promise<Received<T>> {
     const existing = this.messages.find((m) => m.t === type);
-    if (existing) return existing as Extract<ServerMessage, { t: T }>;
+    if (existing) return existing as Received<T>;
 
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -100,20 +113,22 @@ class TestClient {
         reject(new Error(`Sin mensaje "${type}" en ${timeoutMs} ms`));
       }, timeoutMs);
 
-      const onMessage = (data: WebSocket.RawData): void => {
-        const message = JSON.parse(textOf(data)) as ServerMessage;
-        if (message.t !== type) return;
+      // Se mira lo ya acumulado, no la trama cruda: el listener de arriba se
+      // registro antes, asi que para cuando llega aqui ya esta reconstruida.
+      const onMessage = (): void => {
+        const message = this.messages.find((m) => m.t === type);
+        if (!message) return;
         clearTimeout(timer);
         this.socket.off('message', onMessage);
-        resolve(message as Extract<ServerMessage, { t: T }>);
+        resolve(message as Received<T>);
       };
       this.socket.on('message', onMessage);
     });
   }
 
   /** Espera a recibir `count` instantaneas mas. */
-  async waitForSnapshots(count: number, timeoutMs = 5000): Promise<SnapshotMessage[]> {
-    const collected: SnapshotMessage[] = [];
+  async waitForSnapshots(count: number, timeoutMs = 5000): Promise<FullSnapshot[]> {
+    const collected: FullSnapshot[] = [];
     const deadline = Date.now() + timeoutMs;
     while (collected.length < count) {
       if (Date.now() > deadline) throw new Error('Tiempo agotado esperando instantaneas');

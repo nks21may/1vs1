@@ -517,13 +517,40 @@ así se pudra.
     mismo `playerId` y el mismo `matchId`, las instantáneas se reanudan, se
     vuelve a correr y no hay un solo error de consola.
 
-- [ ] **T13. Instantáneas delta**
+- [x] **T13. Instantáneas delta**
       Se envía el estado completo 64 veces por segundo. Con dos jugadores son ~15 KB/s
       y no molesta, pero mandar solo lo que cambia (o bajar a 32 Hz apoyándose en la
       interpolación) es la mitad del tráfico casi gratis.
   - Medir antes y después: sin número no es una optimización, es una corazonada.
   - Hecho cuando: el cliente reconstruye el estado a partir de deltas y hay test de
     que una secuencia con deltas produce el mismo estado que una completa.
+  - **Hecho (2026-09-05).** Diferencias campo a campo contra la instantánea
+    anterior ([delta.ts](packages/shared/src/delta.ts)), con una completa por
+    segundo como red de seguridad. Protocolo 4 → 5.
+  - **Medido contra el servidor real**, doce segundos de partida contra el bot y
+    el mismo script antes y después: **579 → 188 bytes por instantánea, 36,2 →
+    11,7 KB/s (−67%)**. El enunciado hablaba de ~15 KB/s; la instantánea había
+    engordado desde entonces con el nombre, el marcador y las estadísticas, que
+    son justo lo que ahora no se repite.
+  - **La diferencia va contra el mensaje inmediatamente anterior, sin
+    confirmaciones.** Es lo que permite el transporte: WebSocket es TCP, los
+    mensajes llegan todos y en orden. Con UDP haría falta lo de Quake --
+    diferencias contra la última instantánea _confirmada_, que ya tendría de dónde
+    salir gracias al `ackTick` de T11.
+  - La completa cada segundo (`SNAPSHOT_KEYFRAME_TICKS`) cuesta un 1,6% y es lo
+    que hace que un desajuste imposible-pero-por-si-acaso se cure solo. El
+    decodificador descarta lo que no encaja en vez de aplicarlo a ciegas: un
+    fallo silencioso ahí sería un mundo congelado sin explicación.
+  - Los campos se recorren leyéndolos del propio objeto, no de una lista escrita
+    a mano: añadir un campo a la instantánea no obliga a acordarse de este
+    archivo.
+  - El `MemoryConnection` de los tests y el cliente del e2e reconstruyen con el
+    mismo `SnapshotDecoder` que usa el navegador, así que los tests leen lo que
+    ve un jugador y no lo que sale del cable.
+  - Verificado en Chrome: 868 instantáneas, 14 completas (1,6%), **cero
+    desajustes** rehaciendo la reconstrucción por fuera, y la partida entera
+    funcionando a través de diferencias -- correr, disparar, la ronda perdida con
+    su killfeed y su marcador, y una caída de socket con su reconexión.
 
 - [ ] **T14. Ajustes de mira y teclas**
       Los enlaces de teclado están en el código

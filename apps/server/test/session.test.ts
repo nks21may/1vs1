@@ -467,6 +467,66 @@ describe('compensacion de latencia', () => {
   });
 });
 
+describe('instantaneas diferenciales', () => {
+  /** Una ronda con movimiento y disparos, que es cuando cambian mas campos. */
+  const rondaMovida = () => {
+    const { session, a, b } = newSession();
+    goLive(session);
+    // Durante el calentamiento nadie se mueve y las diferencias salen vacias:
+    // medir ahi seria hacerse trampas. Solo cuenta lo que pasa a partir de aqui.
+    const desde = session.tick;
+
+    // Mas de un segundo, para que caiga al menos una instantanea completa.
+    for (let i = 1; i <= 80; i++) {
+      session.handleMessage(1, input([cmd(i, i % 8 === 0 ? BUTTON.ATTACK : BUTTON.FORWARD, i)]));
+      session.handleMessage(2, input([cmd(i, BUTTON.RIGHT, -i)]));
+      session.update();
+    }
+
+    const enMovimiento = a.all('snapshot').filter((s) => s.tick > desde);
+    return { session, a, b, enMovimiento };
+  };
+
+  it('lo que reconstruye el cliente es lo que tiene el servidor', () => {
+    const { session, a } = rondaMovida();
+    const reconstruido = a.lastFull()!.players;
+
+    expect(reconstruido).toHaveLength(2);
+    for (const player of session.players()) {
+      const visto = reconstruido.find((p) => p.id === player.id)!;
+      expect(visto.x).toBeCloseTo(player.pos.x, 1);
+      expect(visto.y).toBeCloseTo(player.pos.y, 1);
+      expect(visto.z).toBeCloseTo(player.pos.z, 1);
+      expect(visto.health).toBe(player.health);
+      expect(visto.weapon).toBe(player.weapon);
+      expect(visto.ammo).toBe(player.ammo[player.weapon]);
+      expect(visto.name).toBe(player.name);
+    }
+  });
+
+  it('casi todo lo que sale por el cable son diferencias', () => {
+    const { a } = rondaMovida();
+    const cable = a.all('snapshot');
+    const completas = cable.filter((s) => s.base === undefined);
+
+    // Una por segundo, que es lo que cura un desajuste sin costar trafico.
+    expect(completas.length).toBeGreaterThan(0);
+    expect(completas.length / cable.length).toBeLessThan(0.05);
+  });
+
+  it('una diferencia ocupa menos de la mitad que una completa', () => {
+    const { enMovimiento } = rondaMovida();
+    const bytes = (message: unknown) => JSON.stringify(message).length;
+    const media = (n: number[]) => n.reduce((sum, value) => sum + value, 0) / n.length;
+
+    const completas = enMovimiento.filter((s) => s.base === undefined).map(bytes);
+    const diferencias = enMovimiento.filter((s) => s.base !== undefined).map(bytes);
+
+    expect(completas.length).toBeGreaterThan(0);
+    expect(media(diferencias)).toBeLessThan(media(completas) / 2);
+  });
+});
+
 describe('caida del socket', () => {
   it('el jugador sigue en el mundo y se le puede disparar', () => {
     const { session } = newSession();
@@ -563,7 +623,7 @@ describe('contenido del snapshot', () => {
     goLive(session);
     ticks(session, 1);
 
-    const me = a.last('snapshot')!.players.find((p) => p.id === 1)!;
+    const me = a.lastFull()!.players.find((p) => p.id === 1)!;
     expect(me.health).toBe(MAX_HEALTH);
     expect(me.flags & SNAPSHOT_FLAG.ALIVE).toBeTruthy();
     expect(me.score).toBe(0);
@@ -673,7 +733,7 @@ describe('angulo de vista al reaparecer', () => {
     session.handleMessage(1, input([cmd(1, 0, inicial)]));
     ticks(session, 5);
 
-    const me = a.last('snapshot')!.players.find((p) => p.id === 1)!;
+    const me = a.lastFull()!.players.find((p) => p.id === 1)!;
     const spawnActual = ATRIUM.spawns.find((s) => Math.abs(s.pos.x - me.x) < 1)!;
     const pedido = a
       .all('snapshot')
@@ -836,7 +896,7 @@ describe('estadisticas de la partida', () => {
 
     tirador(session)(2, 180);
 
-    const me = a.last('snapshot')!.players.find((p) => p.id === 1)!;
+    const me = a.lastFull()!.players.find((p) => p.id === 1)!;
     expect(me.stats).toMatchObject({ shots: 2, hits: 0 });
   });
 

@@ -29,6 +29,7 @@ import {
   type PlayerState,
   type PlayerStats,
   SNAPSHOT_FLAG,
+  SNAPSHOT_KEYFRAME_TICKS,
   type ShotRequest,
   TICK_DT,
   TICK_INTERVAL_MS,
@@ -42,6 +43,7 @@ import {
   createCollisionWorld,
   createFootstepTracker,
   createPlayer,
+  diffPlayers,
   getWeapon,
   length2D,
   respawnPlayer,
@@ -79,6 +81,11 @@ interface Participant {
    * instantaneas ni manda comandos hasta que vuelva.
    */
   connected: boolean;
+  /**
+   * Ultima instantanea enviada a este cliente. Es la base de la siguiente
+   * diferencia; `null` obliga a mandar una completa.
+   */
+  lastSnapshot: { tick: number; players: PlayerSnapshot[] } | null;
   /** Indice del punto de aparicion, alternado cada ronda. */
   spawnSlot: number;
   /**
@@ -157,6 +164,7 @@ export class MatchSession {
       lastCommand: { seq: 0, buttons: 0, yaw: spawn.yaw, pitch: 0, dt: TICK_DT },
       latency: new LatencyEstimator(),
       connected: true,
+      lastSnapshot: null,
       spawnSlot: slot,
       pendingViewYaw: spawn.yaw,
       footsteps: createFootstepTracker(),
@@ -186,6 +194,7 @@ export class MatchSession {
     if (!participant) return false;
 
     participant.connected = false;
+    participant.lastSnapshot = null;
     // Los comandos en vuelo son de antes de la caida: aplicarlos al volver
     // moveria al jugador por ordenes que ya no quiere dar.
     participant.queue.length = 0;
@@ -199,6 +208,8 @@ export class MatchSession {
 
     participant.connection = connection;
     participant.connected = true;
+    // Quien vuelve no tiene sobre que aplicar una diferencia.
+    participant.lastSnapshot = null;
     // El cliente puede haber recargado la pagina y empezar a contar de cero,
     // asi que la numeracion de comandos arranca de nuevo.
     participant.highestSeq = -1;
@@ -580,18 +591,33 @@ export class MatchSession {
           : event,
       );
 
+      // De un tick al siguiente casi nada cambia, asi que solo viaja lo que si.
+      // Una vez por segundo va entera, para que un desajuste no sea permanente.
+      const previous = participant.lastSnapshot;
+      const diff =
+        previous !== null && this.tick % SNAPSHOT_KEYFRAME_TICKS !== 0
+          ? { base: previous.tick, ...diffPlayers(previous.players, players) }
+          : null;
+
       participant.connection.send({
         t: 'snapshot',
         ...(participant.pendingViewYaw === null ? {} : { viewYaw: participant.pendingViewYaw }),
         tick: this.tick,
         time: round2(this.timeMs),
         ack: participant.lastProcessedSeq,
-        players,
+        ...(diff === null
+          ? { players }
+          : {
+              base: diff.base,
+              players: diff.players,
+              ...(diff.gone.length === 0 ? {} : { gone: diff.gone }),
+            }),
         phase: this.match.phase,
         phaseTime: round2(Math.max(0, this.match.phaseRemaining)),
         round: this.match.round,
         events,
       });
+      participant.lastSnapshot = { tick: this.tick, players };
       participant.pendingViewYaw = null;
     }
   }

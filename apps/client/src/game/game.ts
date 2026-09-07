@@ -17,7 +17,7 @@ import {
   INTERP_DELAY_MS,
   type MatchPhase,
   type PlayerSnapshot,
-  type SnapshotMessage,
+  type FullSnapshot,
   TICK_DT,
   type UserCommand,
   type Vec3,
@@ -96,7 +96,7 @@ export class Game {
   /** True entre que se cae el socket y se vuelve, para avisar de las dos cosas. */
   private reconnecting = false;
   private remotePlayers: InterpolatedPlayer[] = [];
-  private latestSnapshot: SnapshotMessage | null = null;
+  private latestSnapshot: FullSnapshot | null = null;
 
   // Retroceso visual de la camara: sigue al patron del arma solo en parte, de
   // modo que compensar el spray sigue siendo cosa del jugador.
@@ -488,7 +488,7 @@ export class Game {
   }
 
   /** Las filas del marcador, con el jugador local siempre el primero. */
-  private statsRows(snapshot: SnapshotMessage): StatsRow[] {
+  private statsRows(snapshot: FullSnapshot): StatsRow[] {
     return [...snapshot.players]
       .sort((a, b) => Number(b.id === this.localId) - Number(a.id === this.localId))
       .map((player) => ({
@@ -501,7 +501,7 @@ export class Game {
       }));
   }
 
-  private onSnapshot(message: SnapshotMessage, receivedAt: number): void {
+  private onSnapshot(message: FullSnapshot, receivedAt: number): void {
     this.latestSnapshot = message;
     this.phase = message.phase;
     this.phaseRemaining = message.phaseTime;
@@ -546,7 +546,7 @@ export class Game {
     this.lastPitch = self.pitch;
   }
 
-  private handleEvents(message: SnapshotMessage): void {
+  private handleEvents(message: FullSnapshot): void {
     for (const event of message.events) {
       switch (event.t) {
         case 'shot': {
@@ -649,7 +649,7 @@ export class Game {
     }
   }
 
-  private onRoundStart(message: SnapshotMessage, round: number): void {
+  private onRoundStart(message: FullSnapshot, round: number): void {
     const self = message.players.find((p) => p.id === this.localId);
     if (self && this.prediction) {
       // Reaparecer descarta la prediccion pendiente: el estado nuevo lo fija el
@@ -665,7 +665,7 @@ export class Game {
     this.audio.play('roundStart');
   }
 
-  private nameOf(message: SnapshotMessage, id: number): string {
+  private nameOf(message: FullSnapshot, id: number): string {
     return message.players.find((p) => p.id === id)?.name ?? 'JUGADOR';
   }
 
@@ -674,7 +674,7 @@ export class Game {
    * la partida. Se usa la instantanea y no el avatar interpolado porque es la
    * posicion que el servidor da por buena para ese evento.
    */
-  private positionOf(message: SnapshotMessage, id: number): Vec3 | undefined {
+  private positionOf(message: FullSnapshot, id: number): Vec3 | undefined {
     const player = message.players.find((p) => p.id === id);
     return player ? vec3(player.x, player.y, player.z) : undefined;
   }

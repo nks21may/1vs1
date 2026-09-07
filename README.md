@@ -152,6 +152,25 @@ Lo que ningún servidor puede distinguir es a un cliente que _dice_ ir retrasado
 de uno que lo va de verdad. Contra eso está el tope: el rebobinado nunca pasa de
 200 ms, se sostenga la mentira lo que se sostenga.
 
+**Instantáneas diferenciales.** El estado completo son ~580 bytes y sale 64 veces
+por segundo, pero de un tick al siguiente casi todo es idéntico: el nombre, el
+arma, la vida, el marcador y las estadísticas no cambian, y lo que cambia es casi
+siempre solo la posición y los ángulos. Así que solo viaja lo que cambia, medido
+campo a campo contra la instantánea anterior.
+
+El transporte es WebSocket, o sea TCP: los mensajes llegan todos y en orden, así
+que la diferencia puede ir contra el mensaje inmediatamente anterior sin
+confirmaciones ni reenvíos. Una vez por segundo va una completa de todos modos,
+para que un desajuste --que no debería ocurrir-- se cure solo en vez de quedarse
+para el resto de la partida. Cuesta un 1,6% del tráfico.
+
+Medido contra el servidor real, doce segundos de partida contra el bot:
+
+|                       | antes     | ahora     |
+| --------------------- | --------- | --------- |
+| bytes por instantánea | 579       | 188       |
+| tráfico del servidor  | 36,2 KB/s | 11,7 KB/s |
+
 **Caerse no es irse.** Si el socket muere, el servidor no echa al jugador: le
 guarda el sitio diez segundos. En el `welcome` viaja un ticket opaco, y quien
 vuelve con él recupera su jugador -- el mismo, con su vida, su arma y su posición
@@ -304,7 +323,7 @@ la prosa, solo alinea tablas y normaliza el énfasis.
 
 ## Tests
 
-433 tests, ~98% de cobertura sobre la simulación y el servidor.
+447 tests, ~98% de cobertura sobre la simulación y el servidor.
 
 ```
 packages/shared/test/   Física, colisión, armas, hitscan, reglas, protocolo, mapa
@@ -369,7 +388,8 @@ instancias haría falta un emparejador externo, que hoy no existe.
 - **Emparejamiento simple**: por orden de llegada, sin nivel ni regiones.
 - **Dos mapas**; la definición admite añadir más sin tocar el motor.
 - **El protocolo es JSON**: cómodo de depurar y suficiente para dos jugadores
-  (~15 KB/s), pero un formato binario sería más eficiente con más jugadores.
+  (~12 KB/s con las instantáneas diferenciales), pero un formato binario sería
+  más eficiente con más jugadores.
 - **El bot navega por una rejilla, no por una malla**: el grafo se deduce del
   mapa con la misma colisión que usa la simulación, así que un mapa nuevo trae su
   navegación sin anotar nada. Es suficiente para estos dos mapas; una malla de
