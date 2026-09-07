@@ -49,7 +49,7 @@ así que tras un reinicio de la máquina el juego vuelve solo.
 git clone https://github.com/nks21may/1vs1.git neonduel
 cd neonduel
 docker compose up -d --build
-curl -s localhost:8090/health     # {"ok":true,"sessions":0,"version":3}
+curl -s localhost:8090/health     # {"ok":true,"sessions":0,"version":4}
 ```
 
 > Si el repositorio es privado, o prefieres no darle acceso a la máquina, copia

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { MAX_COMMANDS_PER_PACKET, MAX_PITCH, TICK_DT } from '../src/constants.js';
+import { MAX_COMMANDS_PER_PACKET, MAX_PITCH, MAX_TOKEN_LENGTH, TICK_DT } from '../src/constants.js';
 import {
   encodeServerMessage,
   parseClientMessage,
@@ -34,6 +34,29 @@ describe('parseClientMessage', () => {
   it('acepta un join y limpia el nombre', () => {
     const msg = parseClientMessage('{"t":"join","name":"  NEO  ","version":1}');
     expect(msg).toEqual({ t: 'join', name: 'NEO', version: 1 });
+  });
+
+  it('el join puede traer un ticket de reconexion, y sin el no aparece', () => {
+    expect(parseClientMessage('{"t":"join","name":"NEO","version":1,"token":"abc"}')).toEqual({
+      t: 'join',
+      name: 'NEO',
+      version: 1,
+      token: 'abc',
+    });
+    // Vacio es como no traerlo, y uno enorme se recorta antes de guardarlo.
+    expect(parseClientMessage('{"t":"join","name":"NEO","version":1,"token":""}')).toEqual({
+      t: 'join',
+      name: 'NEO',
+      version: 1,
+    });
+    const largo = parseClientMessage(
+      JSON.stringify({ t: 'join', name: 'NEO', version: 1, token: 'x'.repeat(500) }),
+    );
+    expect(largo).toMatchObject({ token: 'x'.repeat(MAX_TOKEN_LENGTH) });
+  });
+
+  it('acepta la salida voluntaria, que no es lo mismo que caerse', () => {
+    expect(parseClientMessage('{"t":"leave"}')).toEqual({ t: 'leave' });
   });
 
   it('acepta un paquete de entrada valido', () => {

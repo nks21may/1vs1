@@ -152,6 +152,22 @@ Lo que ningún servidor puede distinguir es a un cliente que _dice_ ir retrasado
 de uno que lo va de verdad. Contra eso está el tope: el rebobinado nunca pasa de
 200 ms, se sostenga la mentira lo que se sostenga.
 
+**Caerse no es irse.** Si el socket muere, el servidor no echa al jugador: le
+guarda el sitio diez segundos. En el `welcome` viaja un ticket opaco, y quien
+vuelve con él recupera su jugador -- el mismo, con su vida, su arma y su posición
+-- en la ronda que se estuviera jugando. El cliente lo reintenta solo, avisando
+en pantalla, y si nadie vuelve antes de que expire la ventana, entonces sí se
+cuenta como abandono y la partida es del rival.
+
+Mientras tanto el mundo no se detiene: el cuerpo del desconectado se queda
+plantado donde estaba y se le puede disparar. Es la consecuencia honesta de
+perder la conexión, y evita tener que inventar reglas -- ni invulnerabilidad, ni
+pausar la ronda -- para un caso que dura segundos.
+
+Irse a propósito sí es inmediato: el cliente manda un `leave` antes de cerrar,
+porque si no el rival tendría que esperar a que expirase un hueco que nadie va a
+ocupar.
+
 **El ángulo de vista lo fija el servidor al reaparecer.** Los ángulos viajan en
 cada comando del cliente, así que girar al jugador en el servidor no basta: el
 siguiente comando, que aún lleva el ángulo anterior, lo desharía en el mismo
@@ -288,7 +304,7 @@ la prosa, solo alinea tablas y normaliza el énfasis.
 
 ## Tests
 
-416 tests, ~98% de cobertura sobre la simulación y el servidor.
+433 tests, ~98% de cobertura sobre la simulación y el servidor.
 
 ```
 packages/shared/test/   Física, colisión, armas, hitscan, reglas, protocolo, mapa

@@ -93,6 +93,8 @@ export class Game {
 
   private phase: MatchPhase = 'waiting';
   private phaseRemaining = 0;
+  /** True entre que se cae el socket y se vuelve, para avisar de las dos cosas. */
+  private reconnecting = false;
   private remotePlayers: InterpolatedPlayer[] = [];
   private latestSnapshot: SnapshotMessage | null = null;
 
@@ -141,7 +143,18 @@ export class Game {
         if (mapa && mapa !== this.map) this.setMap(mapa);
       },
       onSnapshot: (message, receivedAt) => this.onSnapshot(message, receivedAt),
-      onStatus: (status, detail) => this.callbacks.onStatus(status, detail),
+      onStatus: (status, detail) => {
+        // Reconectar pasa con el menu oculto: sin decirlo en el HUD, el jugador
+        // solo ve el mundo congelado y no sabe si esperar o volver al menu.
+        if (status === 'connecting' && detail) {
+          this.reconnecting = true;
+          this.hud.announce(detail, 'neutral', 1500);
+        } else if (status === 'connected' && this.reconnecting) {
+          this.reconnecting = false;
+          this.hud.announce('DE VUELTA');
+        }
+        this.callbacks.onStatus(status, detail);
+      },
     });
 
     this.input.onLockChange = (locked) => this.callbacks.onLockChange(locked);

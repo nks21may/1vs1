@@ -73,6 +73,12 @@ interface Participant {
   lastCommand: UserCommand;
   /** Latencia medida por el servidor, no declarada por el cliente. */
   latency: LatencyEstimator;
+  /**
+   * False mientras el socket esta caido. El jugador sigue en el mundo -- se le
+   * ve, se le puede disparar y la gravedad le afecta -- pero no recibe
+   * instantaneas ni manda comandos hasta que vuelva.
+   */
+  connected: boolean;
   /** Indice del punto de aparicion, alternado cada ronda. */
   spawnSlot: number;
   /**
@@ -131,8 +137,13 @@ export class MatchSession {
     return this.participants.get(playerId)?.stats ?? { kills: 0, deaths: 0, shots: 0, hits: 0 };
   }
 
-  /** Anade un jugador y le envia el mensaje de bienvenida. */
-  join(connection: Connection): PlayerState {
+  /**
+   * Anade un jugador y le envia el mensaje de bienvenida.
+   *
+   * El `token` viaja tal cual en el `welcome`: la sesion no lo interpreta, solo
+   * lo transporta para quien sepa reconectar (el `GameServer`).
+   */
+  join(connection: Connection, token?: string): PlayerState {
     const slot = this.participants.size % 2;
     const spawn = this.map.spawns[slot]!;
     const player = createPlayer(connection.id, connection.name, spawn.pos, spawn.yaw);
@@ -145,20 +156,14 @@ export class MatchSession {
       highestSeq: -1,
       lastCommand: { seq: 0, buttons: 0, yaw: spawn.yaw, pitch: 0, dt: TICK_DT },
       latency: new LatencyEstimator(),
+      connected: true,
       spawnSlot: slot,
       pendingViewYaw: spawn.yaw,
       footsteps: createFootstepTracker(),
       stats: { kills: 0, deaths: 0, shots: 0, hits: 0 },
     });
 
-    connection.send({
-      t: 'welcome',
-      playerId: connection.id,
-      mapName: this.map.name,
-      tickRate: TICK_RATE,
-      matchId: this.matchId,
-      version: PROTOCOL_VERSION,
-    });
+    this.sendWelcome(connection, token);
 
     this.handleMatchEvents(this.match.addPlayer(connection.id));
     return player;
@@ -167,6 +172,61 @@ export class MatchSession {
   leave(connectionId: number): void {
     if (!this.participants.delete(connectionId)) return;
     this.handleMatchEvents(this.match.removePlayer(connectionId));
+  }
+
+  /**
+   * El socket se ha caido, pero el jugador no se ha ido: se le guarda el sitio.
+   *
+   * No se toca el marcador ni se avisa a la partida, asi que la ronda sigue
+   * corriendo con su cuerpo plantado donde estaba. Es la consecuencia honesta
+   * de caerse: quien vuelve recupera su jugador, no el tiempo perdido.
+   */
+  disconnect(connectionId: number): boolean {
+    const participant = this.participants.get(connectionId);
+    if (!participant) return false;
+
+    participant.connected = false;
+    // Los comandos en vuelo son de antes de la caida: aplicarlos al volver
+    // moveria al jugador por ordenes que ya no quiere dar.
+    participant.queue.length = 0;
+    return true;
+  }
+
+  /** Vuelve a atar un jugador a un socket nuevo. */
+  reconnect(connectionId: number, connection: Connection, token?: string): boolean {
+    const participant = this.participants.get(connectionId);
+    if (!participant) return false;
+
+    participant.connection = connection;
+    participant.connected = true;
+    // El cliente puede haber recargado la pagina y empezar a contar de cero,
+    // asi que la numeracion de comandos arranca de nuevo.
+    participant.highestSeq = -1;
+    participant.lastProcessedSeq = 0;
+    participant.latency = new LatencyEstimator();
+    // Que adopte el angulo que tiene su jugador ahora, no el que recuerde.
+    participant.pendingViewYaw = participant.player.yaw;
+
+    connection.name = participant.player.name;
+    this.sendWelcome(connection, token);
+    return true;
+  }
+
+  /** True si el jugador sigue en la partida con su socket vivo. */
+  isConnected(connectionId: number): boolean {
+    return this.participants.get(connectionId)?.connected ?? false;
+  }
+
+  private sendWelcome(connection: Connection, token?: string): void {
+    connection.send({
+      t: 'welcome',
+      playerId: connection.id,
+      mapName: this.map.name,
+      tickRate: TICK_RATE,
+      matchId: this.matchId,
+      version: PROTOCOL_VERSION,
+      ...(token ? { token } : {}),
+    });
   }
 
   /** Procesa un mensaje ya validado por el protocolo. */
@@ -508,6 +568,9 @@ export class MatchSession {
         participant.pendingViewYaw = null;
         continue;
       }
+      // A quien tiene el socket caido no se le manda nada, y sobre todo no se
+      // le consume el `pendingViewYaw`: lo necesita al volver.
+      if (!participant.connected) continue;
 
       // Cada cliente recibe marcados como `local` los disparos que ya predijo,
       // para no dibujar dos veces el mismo trazador.

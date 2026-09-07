@@ -4,6 +4,8 @@ import {
   ATRIUM,
   BUTTON,
   DEFAULT_MATCH_CONFIG,
+  RECONNECT_GRACE_SECONDS,
+  TICK_RATE,
   createPlayer,
   hasButton,
   vec3,
@@ -95,6 +97,113 @@ describe('emparejamiento', () => {
 
     expect(a.all('snapshot')).toHaveLength(2);
     expect(b.all('snapshot')).toHaveLength(2);
+  });
+});
+
+describe('reconexion', () => {
+  const GRACE_TICKS = RECONNECT_GRACE_SECONDS * TICK_RATE;
+
+  const tokenOf = (connection: MemoryConnection): string => {
+    const token = connection.last('welcome')?.token;
+    if (token === undefined) throw new Error('el welcome no traia ticket');
+    return token;
+  };
+
+  /** Dos humanos emparejados, con el ticket del primero a mano. */
+  const duel = () => {
+    const server = new GameServer({ matchConfig: config });
+    const a = new MemoryConnection(server.allocateConnectionId());
+    const b = new MemoryConnection(server.allocateConnectionId());
+    const session = server.joinMatch(a);
+    server.joinMatch(b);
+    return { server, a, b, session, token: tokenOf(a) };
+  };
+
+  it('vuelve con su ticket y recupera su jugador, no uno nuevo', () => {
+    const { server, a, session, token } = duel();
+    const player = session.playerOf(a.id)!;
+    player.pos = vec3(123, 456, 0);
+
+    server.disconnect(a.id);
+    const id = server.reconnectableId(token);
+    expect(id).toBe(a.id);
+
+    const vuelta = new MemoryConnection(id!);
+    expect(server.reconnect(vuelta.id, vuelta)).toBe(session);
+
+    expect(session.isConnected(a.id)).toBe(true);
+    // El mismo objeto: conserva vida, arma, munición y sitio en el mapa.
+    expect(session.playerOf(a.id)).toBe(player);
+    expect(session.playerOf(a.id)!.pos.x).toBe(123);
+    // Y el ticket sigue sirviendo, por si se vuelve a caer.
+    expect(vuelta.last('welcome')).toMatchObject({ playerId: a.id, token });
+  });
+
+  it('mientras esta caido sigue en el mundo pero no recibe instantaneas', () => {
+    const { server, a, session } = duel();
+    server.disconnect(a.id);
+    const antes = a.all('snapshot').length;
+
+    server.step();
+    server.step();
+
+    expect(a.all('snapshot')).toHaveLength(antes);
+    expect(session.playerCount).toBe(2);
+    expect(session.isConnected(a.id)).toBe(false);
+  });
+
+  it('el sitio expira si no vuelve, y la partida es del rival', () => {
+    const { server, a, b, session, token } = duel();
+    server.disconnect(a.id);
+
+    for (let i = 0; i < GRACE_TICKS; i++) server.step();
+
+    expect(session.playerCount).toBe(1);
+    expect(server.pendingCount).toBe(0);
+    expect(server.reconnectableId(token)).toBeNull();
+    expect(session.match.matchWinner).toBe(b.id);
+  });
+
+  it('el ticket vale hasta el ultimo tick de la ventana', () => {
+    const { server, a, token } = duel();
+    server.disconnect(a.id);
+
+    for (let i = 0; i < GRACE_TICKS - 1; i++) server.step();
+    expect(server.reconnectableId(token)).toBe(a.id);
+
+    server.step();
+    expect(server.reconnectableId(token)).toBeNull();
+  });
+
+  it('irse a proposito no guarda el sitio', () => {
+    const { server, a, session, token } = duel();
+    server.leave(a.id);
+
+    expect(server.pendingCount).toBe(0);
+    expect(server.reconnectableId(token)).toBeNull();
+    expect(session.playerCount).toBe(1);
+  });
+
+  it('un ticket que no es de nadie caido no reconecta', () => {
+    const { server, b, token } = duel();
+    // Inventado.
+    expect(server.reconnectableId('7c9e6679-no-existe')).toBeNull();
+    // De alguien que sigue conectado: no hay hueco que reclamar.
+    expect(server.reconnectableId(tokenOf(b))).toBeNull();
+    // Y el de quien no se ha caido todavia, tampoco.
+    expect(server.reconnectableId(token)).toBeNull();
+  });
+
+  it('la partida no se recoge mientras quede alguien por volver', () => {
+    const { server, a, b } = duel();
+    server.disconnect(a.id);
+    server.leave(b.id);
+
+    // El hueco de `a` sigue reservado, asi que la sesion no se desmonta.
+    expect(server.sessionCount).toBe(1);
+
+    for (let i = 0; i < GRACE_TICKS; i++) server.step();
+    expect(server.sessionCount).toBe(0);
   });
 });
 

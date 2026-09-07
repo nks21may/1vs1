@@ -10,12 +10,12 @@
  * y un paquete malformado se descarta en lugar de propagar `NaN` a la fisica.
  */
 
-import { MAX_COMMANDS_PER_PACKET, MAX_PITCH, TICK_DT } from './constants.js';
+import { MAX_COMMANDS_PER_PACKET, MAX_PITCH, MAX_TOKEN_LENGTH, TICK_DT } from './constants.js';
 import type { MatchPhase, RoundEndReason } from './match.js';
 import type { UserCommand } from './movement.js';
 import { WEAPON_SLOTS, type HitGroup, type WeaponId } from './weapons.js';
 
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 // --- Cliente -> Servidor ---
 
@@ -23,6 +23,12 @@ export interface JoinMessage {
   t: 'join';
   name: string;
   version: number;
+  /**
+   * Ticket entregado en el `welcome` anterior. Si sigue vigente, el servidor
+   * devuelve al jugador su sitio en la partida en curso en vez de meterlo en
+   * una nueva. Lo genera el servidor: el cliente solo lo guarda y lo repite.
+   */
+  token?: string;
 }
 
 export interface InputMessage {
@@ -46,7 +52,18 @@ export interface PingMessage {
   time: number;
 }
 
-export type ClientMessage = JoinMessage | InputMessage | PingMessage;
+/**
+ * Salida voluntaria.
+ *
+ * Cerrar el socket sin mas es indistinguible de una caida, y una caida guarda
+ * el sitio unos segundos. Este mensaje es la diferencia: quien se va lo dice, y
+ * el rival no tiene que esperar a que expire un hueco que nadie va a ocupar.
+ */
+export interface LeaveMessage {
+  t: 'leave';
+}
+
+export type ClientMessage = JoinMessage | InputMessage | PingMessage | LeaveMessage;
 
 // --- Servidor -> Cliente ---
 
@@ -57,6 +74,11 @@ export interface WelcomeMessage {
   tickRate: number;
   matchId: string;
   version: number;
+  /**
+   * Ticket para volver a esta misma partida si se cae el socket. Solo lo emite
+   * la capa que sabe reconectar, asi que en una sesion suelta no viene.
+   */
+  token?: string;
 }
 
 export interface PlayerSnapshot {
@@ -245,7 +267,11 @@ export const parseClientMessage = (raw: string): ClientMessage | null => {
     case 'join': {
       if (typeof msg.name !== 'string') return null;
       const version = isFiniteNumber(msg.version) ? msg.version : 0;
-      return { t: 'join', name: sanitizeName(msg.name), version };
+      const token =
+        typeof msg.token === 'string' && msg.token.length > 0
+          ? msg.token.slice(0, MAX_TOKEN_LENGTH)
+          : undefined;
+      return { t: 'join', name: sanitizeName(msg.name), version, ...(token ? { token } : {}) };
     }
     case 'input': {
       if (!Array.isArray(msg.cmds)) return null;
@@ -265,6 +291,8 @@ export const parseClientMessage = (raw: string): ClientMessage | null => {
       if (!isFiniteNumber(msg.time)) return null;
       return { t: 'ping', time: msg.time };
     }
+    case 'leave':
+      return { t: 'leave' };
     default:
       return null;
   }

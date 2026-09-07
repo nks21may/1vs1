@@ -138,15 +138,16 @@ export const startServer = async (options: StartOptions = {}): Promise<ServerHan
   const wss = new WebSocketServer({ server: http, maxPayload: MAX_MESSAGE_BYTES });
 
   wss.on('connection', (socket, request) => {
-    const id = game.allocateConnectionId();
     const url = new URL(request.url ?? '/', 'http://localhost');
     const botSkill = url.searchParams.get('bot');
     // Mapa pedido por el cliente. Si el nombre no existe, se ignora y se juega
     // en el de siempre: un parametro raro no debe tumbar la conexion.
     const requestedMap = getMap(url.searchParams.get('map'));
-    const connection = new SocketConnection(id, socket, `PLAYER_${id}`);
 
-    let joined = false;
+    /** Null hasta que llega un `join` valido: antes no ocupa partida. */
+    let connectionId: number | null = null;
+    /** True si el jugador ha dicho que se va, en vez de caerse. */
+    let deliberate = false;
     let messageBudget = MAX_MESSAGES_PER_SECOND;
     const budgetTimer = setInterval(() => {
       messageBudget = MAX_MESSAGES_PER_SECOND;
@@ -164,30 +165,53 @@ export const startServer = async (options: StartOptions = {}): Promise<ServerHan
       const message = parseClientMessage(text);
       if (!message) return;
 
-      if (!joined) {
+      if (connectionId === null) {
         // Hasta que no llega un `join` valido, la conexion no ocupa partida.
         if (message.t !== 'join') return;
         if (message.version !== PROTOCOL_VERSION) {
           socket.close(1002, 'Version de protocolo incompatible');
           return;
         }
-        connection.name = sanitizeName(message.name);
-        joined = true;
+        const name = sanitizeName(message.name);
 
+        // Con un ticket vigente se vuelve a la partida en curso, y con el mismo
+        // identificador: el jugador es el que era. Si ha caducado, o no es de
+        // nadie, se entra como uno nuevo en vez de rechazar la conexion.
+        const reclaimed = message.token ? game.reconnectableId(message.token) : null;
+        if (reclaimed !== null) {
+          const returning = new SocketConnection(reclaimed, socket, name);
+          if (game.reconnect(reclaimed, returning)) {
+            connectionId = reclaimed;
+            return;
+          }
+        }
+
+        const id = game.allocateConnectionId();
+        const connection = new SocketConnection(id, socket, name);
         if (botSkill && BOT_SKILLS.has(botSkill)) {
           game.joinBotMatch(connection, botSkill as BotSkill, requestedMap);
         } else {
           game.joinMatch(connection, requestedMap);
         }
+        connectionId = id;
         return;
       }
 
-      game.handleMessage(id, message);
+      if (message.t === 'leave') {
+        deliberate = true;
+        socket.close(1000, 'Hasta luego');
+        return;
+      }
+
+      game.handleMessage(connectionId, message);
     });
 
     const cleanup = (): void => {
       clearInterval(budgetTimer);
-      if (joined) game.leave(id);
+      if (connectionId === null) return;
+      // Irse y caerse no son lo mismo: al que se cae se le guarda el sitio.
+      if (deliberate) game.leave(connectionId);
+      else game.disconnect(connectionId);
     };
     socket.on('close', cleanup);
     socket.on('error', cleanup);

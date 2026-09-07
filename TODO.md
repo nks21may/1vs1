@@ -485,11 +485,37 @@ así se pudra.
     paquetes de entrada llevan exactamente `{t, cmds, ackTick}`, el `ackTick`
     crece, se corre y se dispara (la munición baja) y no hay errores de consola.
 
-- [ ] **T12. Reconexión**
+- [x] **T12. Reconexión**
       Si se cae el socket se pierde la partida. Guardar la sesión unos segundos con un
       identificador permitiría volver a la ronda en curso.
   - Hecho cuando: un cliente que se reconecta con su identificador recupera su
     jugador, y hay test de que la sesión expira si no vuelve.
+  - **Hecho (2026-09-05).** El `welcome` trae un ticket opaco (`randomUUID`). Si
+    el socket muere, el `GameServer` guarda el sitio diez segundos
+    (`RECONNECT_GRACE_SECONDS`) en vez de llamar a `leave`, y quien vuelve con el
+    ticket hereda su identificador de conexión, que es el del jugador: recupera
+    el mismo objeto, con su vida, su arma y su posición. La caducidad la cuenta
+    `step()` en ticks, así que se prueba sin relojes. Protocolo 3 → 4.
+  - **Hubo que añadir un mensaje `leave`.** Cerrar el socket sin más es
+    indistinguible de una caída, y una caída ahora guarda el sitio: sin avisar,
+    abandonar a propósito habría dejado al rival diez segundos esperando un hueco
+    que nadie iba a ocupar. Quien se va lo dice; quien se cae, no puede.
+  - **Decisión: el caído sigue en el mundo y se le puede disparar.** Ni
+    invulnerabilidad ni pausa de la ronda: son reglas inventadas para un caso que
+    dura segundos, y cualquiera de las dos sería explotable a voluntad. Su cuerpo
+    se queda plantado donde estaba, que es lo que ya hacía el motor cuando dejan
+    de llegar comandos.
+  - Al volver se limpia la cola de comandos en vuelo (son órdenes de antes de la
+    caída), se reinicia la numeración de secuencia (el cliente puede haber
+    recargado la página) y se le pide el ángulo de vista que su jugador tiene
+    ahora, no el que recordara.
+  - El cliente reintenta solo, cinco veces cada 1,2 s -- de sobra dentro de la
+    ventana --, y lo dice en el HUD: «Reconectando (n/5)» y «DE VUELTA».
+  - Verificado en Chrome envolviendo `WebSocket` para poder matar el socket de
+    verdad (la emulación de red de CDP no lo cierra, solo encola las tramas): el
+    cliente vuelve a mandar `join` con el ticket, el segundo `welcome` trae el
+    mismo `playerId` y el mismo `matchId`, las instantáneas se reanudan, se
+    vuelve a correr y no hay un solo error de consola.
 
 - [ ] **T13. Instantáneas delta**
       Se envía el estado completo 64 veces por segundo. Con dos jugadores son ~15 KB/s

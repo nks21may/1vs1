@@ -467,6 +467,79 @@ describe('compensacion de latencia', () => {
   });
 });
 
+describe('caida del socket', () => {
+  it('el jugador sigue en el mundo y se le puede disparar', () => {
+    const { session } = newSession();
+    goLive(session);
+    const shooter = session.playerOf(1)!;
+    const target = session.playerOf(2)!;
+    shooter.pos = vec3(-700, -300, 0);
+    shooter.onGround = true;
+    target.pos = vec3(-300, -300, 0);
+    target.onGround = true;
+    ticks(session, SETTLE_TICKS);
+
+    // Caerse no es irse: el cuerpo se queda plantado donde estaba, que es la
+    // consecuencia honesta de perder la conexion en mitad de una ronda.
+    expect(session.disconnect(2)).toBe(true);
+    session.handleMessage(1, input([cmd(1, BUTTON.ATTACK, 0, 0)]));
+    session.update();
+
+    expect(target.health).toBeLessThan(MAX_HEALTH);
+    expect(session.playerCount).toBe(2);
+  });
+
+  it('al caido no se le mandan instantaneas', () => {
+    const { session, a, b } = newSession();
+    session.disconnect(1);
+    const antesA = a.all('snapshot').length;
+    const antesB = b.all('snapshot').length;
+
+    ticks(session, 3);
+
+    expect(a.all('snapshot')).toHaveLength(antesA);
+    expect(b.all('snapshot')).toHaveLength(antesB + 3);
+  });
+
+  it('al volver adopta el angulo que tiene su jugador, no el que recordaba', () => {
+    const { session } = newSession();
+    goLive(session);
+    session.playerOf(1)!.yaw = 137;
+    session.disconnect(1);
+
+    const vuelta = new MemoryConnection(1, 'ALFA');
+    expect(session.reconnect(1, vuelta)).toBe(true);
+    ticks(session, 1);
+
+    expect(vuelta.last('welcome')).toMatchObject({ playerId: 1 });
+    expect(vuelta.last('snapshot')!.viewYaw).toBe(137);
+  });
+
+  it('los comandos en vuelo antes de la caida no se aplican al volver', () => {
+    const { session } = newSession();
+    goLive(session);
+    const player = session.playerOf(1)!;
+    player.pos = vec3(-700, -300, 0);
+    player.vel = vec3();
+    player.onGround = true;
+
+    // Ordenes de correr que se quedaron en la cola justo antes de caerse.
+    session.handleMessage(1, input([cmd(1, BUTTON.FORWARD), cmd(2, BUTTON.FORWARD)]));
+    session.disconnect(1);
+    session.reconnect(1, new MemoryConnection(1, 'ALFA'));
+    ticks(session, 2);
+
+    expect(player.pos.x).toBeCloseTo(-700, 3);
+    expect(player.pos.y).toBeCloseTo(-300, 3);
+  });
+
+  it('reconectar a alguien que no esta en la partida no hace nada', () => {
+    const { session } = newSession();
+    expect(session.disconnect(99)).toBe(false);
+    expect(session.reconnect(99, new MemoryConnection(99))).toBe(false);
+  });
+});
+
 describe('desconexion', () => {
   it('abandonar da la partida al rival', () => {
     const { session } = newSession();

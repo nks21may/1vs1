@@ -44,6 +44,8 @@ class TestClient {
   private readonly socket: WebSocket;
   private seq = 0;
   private lastTick = 0;
+  /** Ticket de reconexion, tal y como lo guardaria el navegador. */
+  token: string | undefined;
 
   constructor(query = '') {
     this.socket = new WebSocket(`ws://127.0.0.1:${server.port}/${query}`);
@@ -52,6 +54,7 @@ class TestClient {
       // Igual que el navegador: el ultimo tick visto viaja en cada paquete de
       // entrada, y es con el con lo que el servidor mide la latencia.
       if (message.t === 'snapshot') this.lastTick = message.tick;
+      if (message.t === 'welcome') this.token = message.token;
       this.messages.push(message);
     });
   }
@@ -68,8 +71,8 @@ class TestClient {
     this.socket.send(JSON.stringify(message));
   }
 
-  join(name: string, version = PROTOCOL_VERSION): void {
-    this.send({ t: 'join', name, version });
+  join(name: string, version = PROTOCOL_VERSION, token?: string): void {
+    this.send({ t: 'join', name, version, ...(token === undefined ? {} : { token }) });
   }
 
   /** Envia un comando de movimiento y devuelve su numero de secuencia. */
@@ -139,6 +142,17 @@ class TestClient {
 
   close(): void {
     this.socket.close();
+  }
+
+  /** Salida voluntaria: el servidor no guarda el sitio de quien avisa. */
+  leave(): void {
+    this.send({ t: 'leave' });
+    this.socket.close();
+  }
+
+  /** Caida seca, sin trama de cierre: lo que pasa cuando se va la red. */
+  drop(): void {
+    this.socket.terminate();
   }
 }
 
@@ -302,7 +316,7 @@ describe('emparejamiento entre dos clientes', () => {
     b.close();
   });
 
-  it('al desconectarse uno, el otro gana la partida', async () => {
+  it('al irse uno a proposito, el otro gana la partida', async () => {
     const a = new TestClient();
     const b = new TestClient();
     await Promise.all([a.open(), b.open()]);
@@ -313,7 +327,9 @@ describe('emparejamiento entre dos clientes', () => {
     await b.waitFor('welcome');
     await a.waitFor('snapshot');
 
-    b.close();
+    // Avisando de que se va: si solo se cayera, el servidor le guardaria el
+    // sitio y `a` tendria que esperar a que expirase.
+    b.leave();
 
     const deadline = Date.now() + 4000;
     let sawMatchEnd = false;
@@ -324,6 +340,71 @@ describe('emparejamiento entre dos clientes', () => {
     }
 
     expect(sawMatchEnd).toBe(true);
-    a.close();
+    a.leave();
+  });
+});
+
+describe('reconexion', () => {
+  it('una caida no da la partida por perdida al momento', async () => {
+    const a = new TestClient();
+    const b = new TestClient();
+    await Promise.all([a.open(), b.open()]);
+    a.join('QUEDA');
+    b.join('SECAE');
+    await a.waitFor('welcome');
+    await b.waitFor('welcome');
+    await a.waitFor('snapshot');
+
+    b.drop();
+
+    // Durante la ventana de gracia la partida sigue: nadie ha ganado nada.
+    const snapshots = await a.waitForSnapshots(30);
+    expect(snapshots.every((s) => !s.events.some((e) => e.t === 'matchEnd'))).toBe(true);
+    expect(snapshots.at(-1)!.players).toHaveLength(2);
+
+    a.leave();
+  });
+
+  it('volver con el ticket devuelve el mismo jugador', async () => {
+    const a = new TestClient();
+    const b = new TestClient();
+    await Promise.all([a.open(), b.open()]);
+    a.join('VUELVE');
+    b.join('ESPERA');
+    const welcome = await a.waitFor('welcome');
+    await b.waitFor('welcome');
+    await a.waitFor('snapshot');
+    expect(welcome.token).toBeTypeOf('string');
+
+    a.drop();
+
+    const vuelta = new TestClient();
+    await vuelta.open();
+    vuelta.join('VUELVE', PROTOCOL_VERSION, welcome.token);
+
+    const segundo = await vuelta.waitFor('welcome');
+    // El mismo jugador y la misma partida, no una nueva.
+    expect(segundo.playerId).toBe(welcome.playerId);
+    expect(segundo.matchId).toBe(welcome.matchId);
+    expect(segundo.token).toBe(welcome.token);
+
+    const snapshot = await vuelta.waitFor('snapshot');
+    expect(snapshot.players).toHaveLength(2);
+    expect(snapshot.players.some((p) => p.id === welcome.playerId)).toBe(true);
+
+    vuelta.leave();
+    b.leave();
+  });
+
+  it('un ticket que no vale entra como jugador nuevo, no rechaza la conexion', async () => {
+    const client = new TestClient();
+    await client.open();
+    client.join('NUEVO', PROTOCOL_VERSION, 'ticket-inventado');
+
+    const welcome = await client.waitFor('welcome');
+    expect(welcome.playerId).toBeGreaterThan(0);
+    expect(welcome.token).not.toBe('ticket-inventado');
+
+    client.leave();
   });
 });

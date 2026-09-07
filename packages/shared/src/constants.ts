@@ -117,6 +117,10 @@ export const LAG_COMPENSATION_HISTORY_TICKS = 32;
 export const LATENCY_SAMPLES = TICK_RATE;
 /** Techo de una medida suelta. Por encima la conexion ya no es jugable. */
 export const MAX_LATENCY_SAMPLE_MS = 1000;
+/** Tiempo que se guarda el sitio de un jugador cuyo socket se ha caido. */
+export const RECONNECT_GRACE_SECONDS = 10;
+/** Longitud maxima del ticket de reconexion, para no tragar cadenas enormes. */
+export const MAX_TOKEN_LENGTH = 64;
 /** Comandos de entrada maximos que se aceptan por paquete (anti flood). */
 export const MAX_COMMANDS_PER_PACKET = 16;
 /** Comandos maximos que el servidor procesa por tick de un mismo cliente. */
