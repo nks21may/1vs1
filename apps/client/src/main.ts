@@ -10,6 +10,8 @@ import './style.css';
 import { Game } from './game/game.js';
 import { renderStatsRows, type StatsRow } from './hud.js';
 import type { ConnectionStatus } from './game/net.js';
+import { DEFAULT_BINDINGS } from './game/input.js';
+import { mountKeybinds } from './keybinds.js';
 import { loadSettings, saveSettings, type Settings } from './game/settings.js';
 
 const byId = (id: string): HTMLElement => {
@@ -54,12 +56,19 @@ const controls = {
   bloom: byIdOf('bloom', HTMLInputElement),
   netgraph: byIdOf('netgraph-toggle', HTMLInputElement),
   bhopCue: byIdOf('bhop-cue', HTMLInputElement),
+  crosshairColor: byIdOf('crosshair-color', HTMLInputElement),
+  crosshairThickness: byIdOf('crosshair-thickness', HTMLInputElement),
+  crosshairDynamic: byIdOf('crosshair-dynamic', HTMLInputElement),
 };
+
+const keybindsPanel = byId('keybinds');
+const keybindsReset = byIdOf('keybinds-reset', HTMLButtonElement);
 
 const labels = {
   sensitivity: byId('sensitivity-label'),
   fov: byId('fov-label'),
   volume: byId('volume-label'),
+  crosshairThickness: byId('crosshair-thickness-label'),
 };
 
 let settings: Settings = loadSettings();
@@ -77,10 +86,19 @@ const syncControls = (): void => {
   controls.bloom.checked = settings.bloom;
   controls.netgraph.checked = settings.showNetGraph;
   controls.bhopCue.checked = settings.bhopCue;
+  controls.crosshairColor.value = settings.crosshair.color;
+  controls.crosshairThickness.value = String(settings.crosshair.thickness);
+  controls.crosshairDynamic.checked = settings.crosshair.dynamic;
 
   labels.sensitivity.textContent = settings.sensitivity.toFixed(2);
   labels.fov.textContent = String(Math.round(settings.fov));
   labels.volume.textContent = `${Math.round(settings.volume * 100)}%`;
+  labels.crosshairThickness.textContent = String(settings.crosshair.thickness);
+};
+
+/** Cambia un solo campo de la mira sin tocar los demas. */
+const updateCrosshair = (patch: Partial<Settings['crosshair']>): void => {
+  updateSettings({ crosshair: { ...settings.crosshair, ...patch } });
 };
 
 const updateSettings = (patch: Partial<Settings>): void => {
@@ -110,6 +128,27 @@ controls.netgraph.addEventListener('change', () => {
 });
 controls.bhopCue.addEventListener('change', () => {
   updateSettings({ bhopCue: controls.bhopCue.checked });
+});
+controls.crosshairColor.addEventListener('input', () => {
+  updateCrosshair({ color: controls.crosshairColor.value });
+});
+controls.crosshairThickness.addEventListener('input', () => {
+  updateCrosshair({ thickness: Number(controls.crosshairThickness.value) });
+});
+controls.crosshairDynamic.addEventListener('change', () => {
+  updateCrosshair({ dynamic: controls.crosshairDynamic.checked });
+});
+
+const redrawKeybinds = mountKeybinds(
+  keybindsPanel,
+  () => settings.bindings,
+  (bindings) => {
+    updateSettings({ bindings });
+  },
+);
+keybindsReset.addEventListener('click', () => {
+  updateSettings({ bindings: DEFAULT_BINDINGS });
+  redrawKeybinds();
 });
 nameInput.addEventListener('change', () => {
   updateSettings({ name: nameInput.value.trim() || 'JUGADOR' });

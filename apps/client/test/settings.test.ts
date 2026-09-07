@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { DEFAULT_BINDINGS } from '../src/game/input.js';
 import {
   DEFAULT_SETTINGS,
   loadSettings,
@@ -75,6 +76,65 @@ describe('sanitizeSettings', () => {
     expect(sanitizeSettings(null)).toEqual(DEFAULT_SETTINGS);
     expect(sanitizeSettings('cadena')).toEqual(DEFAULT_SETTINGS);
     expect(sanitizeSettings(undefined)).toEqual(DEFAULT_SETTINGS);
+  });
+});
+
+describe('mira configurable', () => {
+  it('un color que no es #rrggbb vuelve al de fabrica', () => {
+    expect(sanitizeSettings({ crosshair: { color: 'rojo' } }).crosshair.color).toBe(
+      DEFAULT_SETTINGS.crosshair.color,
+    );
+    expect(sanitizeSettings({ crosshair: { color: '#2CE8FF' } }).crosshair.color).toBe('#2ce8ff');
+  });
+
+  it('el grosor se acota a lo que se puede ver', () => {
+    expect(sanitizeSettings({ crosshair: { thickness: 99 } }).crosshair.thickness).toBe(6);
+    expect(sanitizeSettings({ crosshair: { thickness: 0 } }).crosshair.thickness).toBe(1);
+  });
+
+  it('sin nada guardado la mira es la de siempre', () => {
+    expect(sanitizeSettings({}).crosshair).toEqual(DEFAULT_SETTINGS.crosshair);
+  });
+});
+
+describe('teclas configurables', () => {
+  it('conserva las que el jugador ha cambiado', () => {
+    const saneado = sanitizeSettings({ bindings: { forward: ['KeyE'] } });
+    expect(saneado.bindings.forward).toEqual(['KeyE']);
+    // Las que no se tocan siguen siendo las de fabrica.
+    expect(saneado.bindings.jump).toEqual(DEFAULT_BINDINGS.jump);
+  });
+
+  it('descarta lo que no es un codigo de tecla', () => {
+    const saneado = sanitizeSettings({
+      bindings: { forward: ['KeyE', 42, null, '<script>'], jump: 'Space' },
+    });
+    expect(saneado.bindings.forward).toEqual(['KeyE']);
+    expect(saneado.bindings.jump).toEqual(DEFAULT_BINDINGS.jump);
+  });
+
+  it('mas de dos teclas por accion se recortan', () => {
+    const saneado = sanitizeSettings({ bindings: { left: ['KeyA', 'KeyB', 'KeyC'] } });
+    expect(saneado.bindings.left).toEqual(['KeyA', 'KeyB']);
+  });
+
+  it('una accion sin ninguna tecla es una eleccion valida', () => {
+    expect(sanitizeSettings({ bindings: { walk: [] } }).bindings.walk).toEqual([]);
+  });
+
+  it('las teclas de las armas se sanean ranura a ranura', () => {
+    const saneado = sanitizeSettings({ bindings: { slots: [['KeyZ'], 'no', null] } });
+    expect(saneado.bindings.slots[0]).toEqual(['KeyZ']);
+    expect(saneado.bindings.slots[1]).toEqual(DEFAULT_BINDINGS.slots[1]);
+    expect(saneado.bindings.slots).toHaveLength(DEFAULT_BINDINGS.slots.length);
+  });
+
+  it('sobreviven a guardar y volver a leer', () => {
+    const storage = memoryStorage();
+    const cambiadas = sanitizeSettings({ bindings: { forward: ['KeyE', 'KeyI'] } });
+    saveSettings(cambiadas, storage);
+
+    expect(loadSettings(storage).bindings.forward).toEqual(['KeyE', 'KeyI']);
   });
 });
 

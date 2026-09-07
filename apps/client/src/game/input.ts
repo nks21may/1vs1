@@ -7,26 +7,43 @@
 
 import { BUTTON, MAX_PITCH, clamp, normalizeAngle } from '@neonduel/shared';
 
-export interface InputBindings {
-  forward: string[];
-  back: string[];
-  left: string[];
-  right: string[];
-  jump: string[];
-  duck: string[];
-  walk: string[];
-  reload: string[];
+/**
+ * Acciones con tecla propia, sin contar las armas.
+ *
+ * El orden es el que se ve en los ajustes: agrupado por sentido --primero
+ * moverse, luego el resto-- y no alfabetico.
+ */
+export const BINDABLE_ACTIONS = [
+  'forward',
+  'back',
+  'left',
+  'right',
+  'jump',
+  'duck',
+  'walk',
+  'reload',
+  'stats',
+] as const;
+
+export type BindableAction = (typeof BINDABLE_ACTIONS)[number];
+
+/**
+ * Teclas de cada accion.
+ *
+ * Cada una admite dos: la principal y una alternativa, que es lo que hace falta
+ * para WASD mas flechas, o el `1` del teclado y el del numerico. Una cadena
+ * vacia es "sin asignar", que es una eleccion valida del jugador.
+ */
+export type InputBindings = Record<BindableAction, string[]> & {
   /**
    * Una tecla por arma, en el orden de `WEAPON_SLOTS`. Es una lista de listas y
    * no un ciclo a proposito: con un ciclo, pulsar dos veces seguido (o que se
    * repita la pulsacion) cambiaba a un arma que nadie habia pedido.
    */
   slots: string[][];
-  /** Abrir el marcador. Es solo del cliente: no viaja al servidor. */
-  stats: string[];
-}
+};
 
-const DEFAULT_BINDINGS: InputBindings = {
+export const DEFAULT_BINDINGS: InputBindings = {
   forward: ['KeyW', 'ArrowUp'],
   back: ['KeyS', 'ArrowDown'],
   left: ['KeyA', 'ArrowLeft'],
@@ -43,6 +60,74 @@ const DEFAULT_BINDINGS: InputBindings = {
   ],
   stats: ['Tab'],
 };
+
+/**
+ * Dos teclas por accion como maximo: principal y alternativa, que es lo que
+ * hace falta para WASD mas flechas o el `1` normal y el del numerico.
+ */
+export const MAX_KEYS_PER_ACTION = 2;
+
+/**
+ * Una tecla concreta de una accion: la principal (0) o la alternativa (1).
+ * Si `action` es un numero, es el indice de una ranura de arma.
+ */
+export interface KeySlot {
+  action: BindableAction | number;
+  index: number;
+}
+
+const keysOf = (bindings: InputBindings, action: BindableAction | number): string[] =>
+  typeof action === 'number' ? (bindings.slots[action] ?? []) : bindings[action];
+
+const withKeys = (
+  bindings: InputBindings,
+  action: BindableAction | number,
+  keys: string[],
+): InputBindings =>
+  typeof action === 'number'
+    ? { ...bindings, slots: bindings.slots.map((old, i) => (i === action ? keys : old)) }
+    : { ...bindings, [action]: keys };
+
+/** Todas las acciones a las que se puede asignar una tecla, armas incluidas. */
+const everyAction = (bindings: InputBindings): (BindableAction | number)[] => [
+  ...BINDABLE_ACTIONS,
+  ...bindings.slots.map((_, index) => index),
+];
+
+/**
+ * Pone `code` en una ranura concreta, quitandolo de donde estuviera.
+ *
+ * Dos acciones con la misma tecla es una forma silenciosa de romperse el
+ * control: al asignar, la tecla se muda, no se duplica. Las listas no tienen
+ * huecos --si una accion tiene una sola tecla, es la principal-- porque eso es
+ * lo que sobrevive a guardar y volver a leer los ajustes. Devuelve enlaces
+ * nuevos: no toca los que recibe.
+ */
+export const assignKey = (bindings: InputBindings, slot: KeySlot, code: string): InputBindings => {
+  let next = bindings;
+  for (const action of everyAction(bindings)) {
+    const keys = keysOf(next, action);
+    if (keys.includes(code))
+      next = withKeys(
+        next,
+        action,
+        keys.filter((key) => key !== code),
+      );
+  }
+
+  const keys = [...keysOf(next, slot.action)];
+  if (slot.index < keys.length) keys[slot.index] = code;
+  else keys.push(code);
+  return withKeys(next, slot.action, keys.slice(0, MAX_KEYS_PER_ACTION));
+};
+
+/** Deja una ranura sin tecla. Una accion sin ninguna es una eleccion valida. */
+export const clearKey = (bindings: InputBindings, slot: KeySlot): InputBindings =>
+  withKeys(
+    bindings,
+    slot.action,
+    keysOf(bindings, slot.action).filter((_, index) => index !== slot.index),
+  );
 
 /** Conversion de sensibilidad al estilo de Source: grados por unidad de raton. */
 const YAW_PER_COUNT = 0.022;
@@ -72,10 +157,14 @@ export class InputManager {
 
   onLockChange: ((locked: boolean) => void) | null = null;
 
-  constructor(
-    private readonly element: HTMLElement,
-    private readonly bindings: InputBindings = DEFAULT_BINDINGS,
-  ) {}
+  /** Las teclas se pueden cambiar en mitad de la partida, desde los ajustes. */
+  private bindings: InputBindings = DEFAULT_BINDINGS;
+
+  constructor(private readonly element: HTMLElement) {}
+
+  setBindings(bindings: InputBindings): void {
+    this.bindings = bindings;
+  }
 
   attach(): void {
     window.addEventListener('keydown', this.handleKeyDown);

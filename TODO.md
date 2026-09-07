@@ -552,12 +552,38 @@ así se pudra.
     funcionando a través de diferencias -- correr, disparar, la ronda perdida con
     su killfeed y su marcador, y una caída de socket con su reconexión.
 
-- [ ] **T14. Ajustes de mira y teclas**
+- [x] **T14. Ajustes de mira y teclas**
       Los enlaces de teclado están en el código
       ([input.ts](apps/client/src/game/input.ts)) y la mira no se puede configurar.
       Ambas cosas son de las primeras que toca cualquiera que juegue en serio.
   - Hecho cuando: se pueden reasignar teclas y ajustar color, grosor y modo
     (estática o dinámica) de la mira, todo persistido con el resto de ajustes.
+  - **Hecho (2026-09-05).** Las teclas y la mira son parte de `Settings`, así que
+    se guardan y se validan con todo lo demás. El panel vive en Ajustes: trece
+    filas (nueve acciones y las cuatro armas), dos teclas por fila.
+  - **Dos teclas por acción, principal y alternativa.** No es un número redondo
+    elegido a ojo: es exactamente lo que usan los enlaces de fábrica (WASD más
+    flechas, `Ctrl`+`C`, el `1` del teclado y el del numérico). Con una sola se
+    perdería la mitad de lo que ya había.
+  - **Una tecla solo puede estar en un sitio**: al asignarla se quita de donde
+    estuviera. Dos acciones con la misma tecla es una forma silenciosa de
+    romperse el control.
+  - **Las listas no tienen huecos.** Es lo que sobrevive a guardar y volver a
+    leer: el saneado descarta lo que no es un código de tecla, así que una lista
+    con un hueco se leería distinta de como se guardó. `assignKey` y `clearKey`
+    mantienen esa forma, y hay test de ello.
+  - El saneado no se fía de nada: descarta lo que no tenga forma de
+    `KeyboardEvent.code`, recorta a dos por acción, y una acción sin ninguna
+    tecla es una elección válida del jugador (para eso está `Retroceso`).
+  - **De paso, un arreglo visual que no era de esta tarea** pero que se veía en
+    la misma captura: en la lista de «Controles» del menú, la línea de las cuatro
+    armas es más ancha que su columna y se salía encima de la de al lado. Le
+    faltaba un `flex-wrap`.
+  - Verificado en Chrome de punta a punta: se cambia el color a `#ff3ea5`, el
+    grosor a 5 y la mira a estática (y se ve así en partida); se reasigna
+    «Saltar» a la `G` y **el jugador salta con `G` y deja de saltar con
+    `Espacio`**, comprobado sobre los comandos que salen por el WebSocket; todo
+    sigue ahí tras recargar la página, y «Teclas de fábrica» lo devuelve.
 
 - [ ] **T15. Docker y observabilidad** — la imagen ya está (2026-09-04); falta la
       observabilidad.

@@ -165,6 +165,31 @@
               <input id="bhop-cue" type="checkbox" /><span>Aviso sonoro de bhop</span>
             </label>
           </div>
+
+          <h3 class="settings-title">Mira</h3>
+          <div class="settings-grid">
+            <label class="field field--inline">
+              <span class="field-label">Color</span>
+              <input id="crosshair-color" type="color" />
+            </label>
+            <label class="field">
+              <span class="field-label">Grosor <b id="crosshair-thickness-label">2</b></span>
+              <input id="crosshair-thickness" type="range" min="1" max="6" step="1" />
+            </label>
+            <label class="checkbox">
+              <input id="crosshair-dynamic" type="checkbox" /><span>Se abre con la dispersión</span>
+            </label>
+          </div>
+
+          <h3 class="settings-title">Teclas</h3>
+          <p class="settings-hint">
+            Pulsa una tecla para asignarla, <kbd>Retroceso</kbd> para quitarla y <kbd>Esc</kbd> para
+            dejarlo como estaba.
+          </p>
+          <div class="keybinds" id="keybinds"></div>
+          <button class="button button--small" type="button" id="keybinds-reset">
+            Teclas de fábrica
+          </button>
         </details>
 
         <div class="controls">

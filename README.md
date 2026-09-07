@@ -48,6 +48,12 @@ un duelo real, **Buscar rival** en dos pestañas o dos equipos.
 Cada arma tiene su propia tecla y siempre la misma: pulsar un número lleva a _esa_
 arma, no a la siguiente de una lista.
 
+Todas son reasignables desde **Ajustes**, con una principal y una alternativa por
+acción (que es lo que hace falta para WASD más flechas, o el `1` del teclado y el
+del numérico). Una tecla solo puede estar en un sitio: al asignarla se muda, no
+se duplica. Ahí mismo se ajustan el color, el grosor y el modo de la mira --
+estática, o abriéndose con la dispersión real del arma.
+
 | Ranura | Arma              | Qué aporta                             | Qué cuesta                     |
 | ------ | ----------------- | -------------------------------------- | ------------------------------ |
 | `1`    | VEKTOR-9 (rifle)  | Automática, patrón memorizable         | ×0,86 de velocidad             |
@@ -323,7 +329,7 @@ la prosa, solo alinea tablas y normaliza el énfasis.
 
 ## Tests
 
-447 tests, ~98% de cobertura sobre la simulación y el servidor.
+467 tests, ~98% de cobertura sobre la simulación y el servidor.
 
 ```
 packages/shared/test/   Física, colisión, armas, hitscan, reglas, protocolo, mapa

@@ -644,6 +644,89 @@ summary:focus-visible {
   cursor: pointer;
 }
 
+/* Un titulo dentro de los ajustes: separa mira y teclas de lo general. */
+.settings-title {
+  margin: 22px 0 0;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.settings-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.field--inline {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+input[type='color'] {
+  width: 52px;
+  height: 26px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+
+/* Teclas: una fila por accion, con la principal y la alternativa. */
+.keybinds {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.keybind-row {
+  display: grid;
+  /* Las columnas caben "Mayús izq" de una linea: si parte, la fila crece y la
+     lista deja de leerse como una tabla. */
+  grid-template-columns: 1fr 96px 96px;
+  align-items: center;
+  gap: 8px;
+}
+
+.keybind-name {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.keybind-key {
+  padding: 6px 8px;
+  white-space: nowrap;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.keybind-key:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.keybind-key.is-capturing {
+  border-color: var(--magenta);
+  color: var(--magenta);
+}
+
+.button--small {
+  margin-top: 12px;
+  padding: 8px 12px;
+  font-size: 11px;
+}
+
 input[type='range'] {
   width: 100%;
   accent-color: var(--cyan);
@@ -683,6 +766,9 @@ input[type='radio'] {
 .controls-list li {
   display: flex;
   align-items: center;
+  /* La linea de las cuatro armas es mas ancha que su columna: sin envolver, se
+     salia encima de la de al lado. */
+  flex-wrap: wrap;
   gap: 5px;
 }
 

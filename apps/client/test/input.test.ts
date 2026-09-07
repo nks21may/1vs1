@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { BUTTON, MAX_PITCH } from '@neonduel/shared';
 
-import { InputManager } from '../src/game/input.js';
+import { DEFAULT_BINDINGS, InputManager, assignKey, clearKey } from '../src/game/input.js';
 
 let element: HTMLElement;
 let input: InputManager;
@@ -231,6 +231,72 @@ describe('setView', () => {
   it('acota el cabeceo indicado', () => {
     input.setView(0, 500);
     expect(input.consume().pitch).toBe(MAX_PITCH);
+  });
+});
+
+describe('reasignar teclas', () => {
+  it('la tecla se muda: no queda en dos acciones a la vez', () => {
+    // `KeyW` es la principal de adelante; ponerla en saltar tiene que quitarla
+    // de donde estaba, o pulsarla haria las dos cosas.
+    const cambiado = assignKey(DEFAULT_BINDINGS, { action: 'jump', index: 0 }, 'KeyW');
+
+    expect(cambiado.jump[0]).toBe('KeyW');
+    expect(cambiado.forward).not.toContain('KeyW');
+  });
+
+  it('las listas no dejan huecos, que es lo que sobrevive a guardarlas', () => {
+    // Asignar a la alternativa de una accion vacia la deja como principal.
+    const vacia = clearKey(clearKey(DEFAULT_BINDINGS, { action: 'duck', index: 1 }), {
+      action: 'duck',
+      index: 0,
+    });
+    expect(vacia.duck).toEqual([]);
+
+    const puesta = assignKey(vacia, { action: 'duck', index: 1 }, 'KeyG');
+    expect(puesta.duck).toEqual(['KeyG']);
+  });
+
+  it('no se acumulan mas de dos teclas por accion', () => {
+    let bindings = DEFAULT_BINDINGS;
+    for (const code of ['KeyG', 'KeyH', 'KeyJ']) {
+      bindings = assignKey(bindings, { action: 'reload', index: 1 }, code);
+    }
+    expect(bindings.reload).toHaveLength(2);
+    expect(bindings.reload[1]).toBe('KeyJ');
+  });
+
+  it('vale tambien para las teclas de arma', () => {
+    const cambiado = assignKey(DEFAULT_BINDINGS, { action: 2, index: 0 }, 'KeyQ');
+
+    expect(cambiado.slots[2]?.[0]).toBe('KeyQ');
+    expect(cambiado.slots).toHaveLength(DEFAULT_BINDINGS.slots.length);
+  });
+
+  it('quitar una tecla no toca las demas acciones', () => {
+    const cambiado = clearKey(DEFAULT_BINDINGS, { action: 'forward', index: 1 });
+
+    expect(cambiado.forward).toEqual(['KeyW']);
+    expect(cambiado.back).toEqual(DEFAULT_BINDINGS.back);
+  });
+
+  it('no modifica los enlaces que recibe', () => {
+    const antes = JSON.stringify(DEFAULT_BINDINGS);
+    assignKey(DEFAULT_BINDINGS, { action: 'jump', index: 0 }, 'KeyW');
+    clearKey(DEFAULT_BINDINGS, { action: 'jump', index: 0 });
+
+    expect(JSON.stringify(DEFAULT_BINDINGS)).toBe(antes);
+  });
+
+  it('el jugador juega con las teclas que ha puesto', () => {
+    input.setBindings(assignKey(DEFAULT_BINDINGS, { action: 'jump', index: 0 }, 'KeyG'));
+
+    key('keydown', 'KeyG');
+    expect(input.consume().buttons & BUTTON.JUMP).toBeTruthy();
+
+    // Y la de fabrica deja de valer, que es la otra mitad de reasignar.
+    key('keyup', 'KeyG');
+    key('keydown', 'Space');
+    expect(input.consume().buttons & BUTTON.JUMP).toBeFalsy();
   });
 });
 

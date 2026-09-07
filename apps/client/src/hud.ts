@@ -9,6 +9,14 @@
 
 import { MAX_HEALTH, clamp } from '@neonduel/shared';
 
+import type { CrosshairSettings } from './game/settings.js';
+
+/**
+ * Separacion de la mira estatica, en pixeles. Es la misma que trae el CSS: sin
+ * dispersion que seguir, la mira se queda como esta en reposo.
+ */
+const STATIC_GAP_PX = 6;
+
 import type { MatchPhase } from '@neonduel/shared';
 
 const byId = (id: string): HTMLElement => {
@@ -100,6 +108,7 @@ export class Hud {
 
   private hitmarkerTimer: ReturnType<typeof setTimeout> | null = null;
   private announcementTimer: ReturnType<typeof setTimeout> | null = null;
+  private crosshairDynamic = true;
   private vignetteTimer: ReturnType<typeof setTimeout> | null = null;
 
   setVisible(visible: boolean): void {
@@ -115,7 +124,16 @@ export class Hud {
    * `spreadDegrees` es el radio del cono; se proyecta a pixeles con el FOV
    * vertical y la altura del lienzo.
    */
+  /** Color, grosor y si la mira sigue a la dispersion o se queda quieta. */
+  setCrosshair(crosshair: CrosshairSettings): void {
+    this.crosshairDynamic = crosshair.dynamic;
+    this.crosshair.style.setProperty('--color', crosshair.color);
+    this.crosshair.style.setProperty('--thick', `${crosshair.thickness}px`);
+    if (!crosshair.dynamic) this.crosshair.style.setProperty('--gap', `${STATIC_GAP_PX}px`);
+  }
+
   setSpread(spreadDegrees: number, fovDegrees: number, viewportHeight: number): void {
+    if (!this.crosshairDynamic) return;
     const halfFov = Math.tan((fovDegrees * Math.PI) / 360);
     const pixels = (Math.tan((spreadDegrees * Math.PI) / 180) / halfFov) * (viewportHeight / 2);
     this.crosshair.style.setProperty('--gap', `${clamp(pixels, 3, 220).toFixed(1)}px`);

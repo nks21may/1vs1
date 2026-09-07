@@ -172,6 +172,8 @@ export class Game {
     this.render.setBloomEnabled(settings.bloom);
     this.audio.setVolume(settings.volume);
     this.hud.setNetGraphVisible(settings.showNetGraph);
+    this.hud.setCrosshair(settings.crosshair);
+    this.input.setBindings(settings.bindings);
   }
 
   /** Conecta y arranca el bucle. `bot` selecciona partida de practica. */
