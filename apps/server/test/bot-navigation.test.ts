@@ -44,6 +44,34 @@ const caminar = (map: GameMap, desde: Vec3, destino: Vec3): number | null => {
   return null;
 };
 
+describe('caminos degenerados', () => {
+  const atrium = MAPS.ATRIUM!;
+
+  it('estar ya en el destino no se lleva por delante el servidor', () => {
+    const nodo = navGraphOf(atrium).nodes[0]!;
+    const bot = new BotController(1, atrium, BOT_DIFFICULTIES.hard, 0x51e);
+    const player = createPlayer(1, 'BOT', { ...nodo }, 0);
+
+    // Si el bot y su objetivo caen en el mismo nodo del grafo, el camino es ese
+    // unico nodo y el bot ya esta encima. Con la version recursiva eso hacia que
+    // `navigateTo` se llamase a si misma sin fin: un `Maximum call stack size
+    // exceeded` que mataba el proceso entero, no solo esa partida. Y no era un
+    // caso rebuscado: basta con perseguir a alguien que esta al lado.
+    for (let tick = 0; tick < 300; tick++) {
+      expect(() => bot.navigateTo(player, { ...nodo })).not.toThrow();
+    }
+  });
+
+  it('un destino fuera del mapa tampoco', () => {
+    const bot = new BotController(1, atrium, BOT_DIFFICULTIES.hard, 0x51e);
+    const player = createPlayer(1, 'BOT', { ...atrium.spawns[0].pos }, 0);
+
+    for (let tick = 0; tick < 300; tick++) {
+      expect(() => bot.navigateTo(player, { x: 1e6, y: 1e6, z: 1e6 })).not.toThrow();
+    }
+  });
+});
+
 describe.each(Object.entries(MAPS))('el bot recorre %s', (_nombre, mapa) => {
   const nodos = navGraphOf(mapa).nodes;
 

@@ -92,6 +92,13 @@ const REPATH_SECONDS = 0.5;
  */
 const WAYPOINT_RADIUS = 22;
 
+/**
+ * Tope de waypoints que se pueden encadenar en un mismo tick. Nadie recorre
+ * tantos nodos en 15 ms: es la salvaguarda contra un camino que se consume a si
+ * mismo sin avanzar, no un limite de navegacion.
+ */
+const MAX_WAYPOINT_STEPS = 64;
+
 /** Sin acercarse al waypoint durante este tiempo, se da por atascado. */
 const STUCK_SECONDS = 1;
 
@@ -251,51 +258,66 @@ export class BotController {
    * llega a un punto cualquiera sin tener que montar una partida entera.
    */
   navigateTo(self: PlayerState, target: Vec3): number {
-    this.repathTimer -= TICK_DT;
-    const objetivoMovido =
-      !this.pathTarget ||
-      Math.hypot(target.x - this.pathTarget.x, target.y - this.pathTarget.y) > REPATH_DISTANCE;
+    // Alcanzar un waypoint no devuelve botones: hay que mirar el siguiente, y
+    // eso incluye rehacer el camino si se ha agotado. Antes era una llamada
+    // recursiva, y ahi estaba el fallo: cuando el bot y su objetivo caen en el
+    // mismo nodo del grafo, el camino es ese unico nodo y el bot ya esta
+    // encima, asi que se pedia el mismo camino y se consumia una y otra vez sin
+    // condicion de parada. Reventaba la pila y se llevaba por delante el
+    // proceso entero --todas las partidas, no solo esa-- con solo perseguir a
+    // alguien que estuviera al lado.
+    for (let paso = 0; paso < MAX_WAYPOINT_STEPS; paso++) {
+      this.repathTimer -= TICK_DT;
+      const objetivoMovido =
+        !this.pathTarget ||
+        Math.hypot(target.x - this.pathTarget.x, target.y - this.pathTarget.y) > REPATH_DISTANCE;
 
-    if (this.path.length === 0 || objetivoMovido || this.repathTimer <= 0) {
-      this.path = findPath(this.nav, self.pos, target);
-      this.pathTarget = { ...target };
-      this.repathTimer = REPATH_SECONDS;
-      this.waypointDistance = Infinity;
-      this.stuckTimer = 0;
-      // El primer nodo suele ser el suelo bajo los pies: ir a el es no ir.
-      if (this.path.length > 1) this.path.shift();
-    }
-
-    const waypoint = this.path[0];
-    if (!waypoint) return BUTTON.FORWARD;
-
-    const dx = waypoint.x - self.pos.x;
-    const dy = waypoint.y - self.pos.y;
-    const distancia = Math.hypot(dx, dy);
-    if (distancia < WAYPOINT_RADIUS) {
-      this.path.shift();
-      this.waypointDistance = Infinity;
-      this.stuckTimer = 0;
-      return this.navigateTo(self, target);
-    }
-
-    // Atasco: si en un segundo no se ha acercado al waypoint, es que hay algo
-    // en medio que el grafo no ve (el rival, sin ir mas lejos). Se salta ese
-    // punto en vez de empujar contra el.
-    this.stuckTimer += TICK_DT;
-    let extra = 0;
-    if (this.stuckTimer >= STUCK_SECONDS) {
-      if (distancia > this.waypointDistance - MIN_PROGRESS_UNITS) {
-        // Enganchado. Saltar resuelve el caso mas comun, quedarse trabado en el
-        // canto de un escalon, y rehacer el camino resuelve el resto.
-        extra = BUTTON.JUMP;
-        this.repathTimer = 0;
+      if (this.path.length === 0 || objetivoMovido || this.repathTimer <= 0) {
+        this.path = findPath(this.nav, self.pos, target);
+        this.pathTarget = { ...target };
+        this.repathTimer = REPATH_SECONDS;
+        this.waypointDistance = Infinity;
+        this.stuckTimer = 0;
+        // El primer nodo suele ser el suelo bajo los pies: ir a el es no ir.
+        if (this.path.length > 1) this.path.shift();
       }
-      this.waypointDistance = distancia;
-      this.stuckTimer = 0;
+
+      const waypoint = this.path[0];
+      if (!waypoint) return BUTTON.FORWARD;
+
+      const dx = waypoint.x - self.pos.x;
+      const dy = waypoint.y - self.pos.y;
+      const distancia = Math.hypot(dx, dy);
+      if (distancia < WAYPOINT_RADIUS) {
+        this.path.shift();
+        this.waypointDistance = Infinity;
+        this.stuckTimer = 0;
+        continue;
+      }
+
+      // Atasco: si en un segundo no se ha acercado al waypoint, es que hay algo
+      // en medio que el grafo no ve (el rival, sin ir mas lejos). Se salta ese
+      // punto en vez de empujar contra el.
+      this.stuckTimer += TICK_DT;
+      let extra = 0;
+      if (this.stuckTimer >= STUCK_SECONDS) {
+        if (distancia > this.waypointDistance - MIN_PROGRESS_UNITS) {
+          // Enganchado. Saltar resuelve el caso mas comun, quedarse trabado en
+          // el canto de un escalon, y rehacer el camino resuelve el resto.
+          extra = BUTTON.JUMP;
+          this.repathTimer = 0;
+        }
+        this.waypointDistance = distancia;
+        this.stuckTimer = 0;
+      }
+
+      return movementButtons(this.yaw, dx / distancia, dy / distancia) | extra;
     }
 
-    return movementButtons(this.yaw, dx / distancia, dy / distancia) | extra;
+    // Se han encadenado tantos waypoints en un solo tick que ya no es andar,
+    // es un camino que no lleva a ninguna parte. Se sigue de frente y en el
+    // tick siguiente se vuelve a intentar.
+    return BUTTON.FORWARD;
   }
 
   /** Invierte la direccion pulsada para frenar de golpe, como un jugador. */

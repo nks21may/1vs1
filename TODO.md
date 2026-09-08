@@ -665,10 +665,11 @@ así se pudra.
 
 ---
 
-## Arreglos de bugs reportados en partida
+## Arreglos de bugs encontrados jugando
 
-Los pidió Nicolás el 2026-09-04 jugando, no salieron de este backlog. Se anotan
-aquí porque dos de ellos cambiaron reglas del juego, no solo código.
+Del B01 al B04 los pidió Nicolás el 2026-09-04 jugando, no salieron de este
+backlog. Se anotan aquí porque dos de ellos cambiaron reglas del juego, no solo
+código. El B05 salió de dejar una partida larga corriendo sola.
 
 - [x] **B01. Una tecla por arma, sin ciclo**
       `Digit2` estaba enlazada al mismo botón que `Q` y ese botón _rotaba_ de arma,
@@ -719,6 +720,33 @@ aquí porque dos de ellos cambiaron reglas del juego, no solo código.
   - Medido encadenando saltos con air-strafe desde 250 u/s: 250 → 270 → 289 → 307
     → ... hasta el techo. Con 12 ticks de retraso (187 ms) la cadena se rompe y la
     velocidad cae por debajo de 150.
+
+- [x] **B05. El bot se llevaba por delante el servidor entero**
+      `navigateTo` se llamaba a sí misma para mirar el siguiente punto del camino
+      cuando ya había alcanzado el actual. Si el bot y su objetivo caían en el
+      mismo nodo del grafo, el camino era ese único nodo y el bot ya estaba
+      encima: se pedía el mismo camino y se consumía una y otra vez, sin
+      condición de parada.
+  - **`RangeError: Maximum call stack size exceeded` y el proceso se muere.** No
+    es una partida rota, son todas: el servidor es un único proceso, así que se
+    lleva por delante a quien estuviera jugando en cualquier otra partida.
+  - **No era un caso rebuscado.** Basta con perseguir a alguien que esté al lado
+    y no sea disparable —justo después de reaparecer, o al doblar una esquina—.
+    Salió en la primera partida completa contra el bot difícil que se dejó
+    correr entera: el servidor murió a los dos minutos, con el marcador 2-5.
+  - Arreglado convirtiendo la recursión en un bucle **con la misma semántica**
+    (cada vuelta es lo que antes era una llamada) y un tope de 64 waypoints por
+    tick. El tope es la salvaguarda, no un límite de navegación: nadie recorre
+    64 nodos en 15 ms.
+  - **Un bucle sin el bloque de recálculo dentro no vale**, aunque parezca más
+    limpio: cada llamada recursiva volvía a evaluar si tocaba rehacer el camino,
+    y sin eso el bot dejaba de subir a los balcones. Lo dijeron los tests de
+    navegación que ya existían, no el ojo.
+  - Hay test de regresión de las dos formas de degenerar el camino: estar ya en
+    el destino, y pedir un destino fuera del mapa.
+  - Verificado repitiendo la partida que lo mató: termina 0-8 con su resumen, el
+    servidor sigue en pie y `/health` responde. 7758 instantáneas, cero
+    desajustes y cero errores de consola.
 
 ---
 
