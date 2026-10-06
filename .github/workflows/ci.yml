@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   check:
@@ -19,3 +20,51 @@ jobs:
       - run: npm run lint
       - run: npm run test:coverage
       - run: npm run build
+
+  # En cada push a main, si los chequeos pasan, construye la imagen y la publica
+  # en GHCR. El deploy no pasa por aca: la VPS no tiene puertos abiertos (todo
+  # entra por el Cloudflare Tunnel), asi que en vez de darle acceso a un runner,
+  # la VPS tira: su timer de deploy baja la imagen nueva. Que corre ahi, y como,
+  # se decide en el repo infra. Mismo esquema que museo y bot_discord.
+  image:
+    needs: check
+    if: github.event_name != 'pull_request'
+    # Runner arm porque la VPS es arm: la imagen sale nativa, sin QEMU.
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          # El tag por SHA es el rollback.
+          tags: |
+            ghcr.io/nks21may/1vs1:latest
+            ghcr.io/nks21may/1vs1:${{ github.sha }}
+          # Ata el package al repo para que herede sus permisos (privado) en vez
+          # de quedar como package suelto de la cuenta.
+          labels: org.opencontainers.image.source=https://github.com/nks21may/1vs1
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Cada push agrega una version. Cinco alcanzan para volver atras; si la
+      # poda falla, la imagen ya esta publicada.
+      - uses: actions/delete-package-versions@v5
+        continue-on-error: true
+        with:
+          package-name: 1vs1
+          package-type: container
+          min-versions-to-keep: 5
