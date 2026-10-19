@@ -1,5 +1,9 @@
 # Desplegar NEONDUEL en una VPS ARM de Oracle Cloud
 
+> Esta guía es para levantarlo a mano en una máquina propia. La instancia
+> pública no se mantiene así: se despliega desde la imagen que publica la CI
+> (ver [Despliegue](README.md#despliegue) en el README).
+
 El juego entero es **un contenedor y un puerto**: el mismo proceso sirve los
 archivos del cliente y el WebSocket, así que no hay base de datos, ni cachés, ni
 servicios que coordinar. Por defecto escucha solo en `127.0.0.1:8090`, para que
@@ -53,8 +57,8 @@ docker compose up -d --build
 curl -s localhost:8090/health     # {"ok":true,"version":5,"tick":64,...}
 ```
 
-> Si el repositorio es privado, o prefieres no darle acceso a la máquina, copia
-> el código con `rsync -a --exclude node_modules --exclude dist . ubuntu@TU_IP:neonduel/`.
+> Si prefieres no clonar en la máquina, copia el código con
+> `rsync -a --exclude node_modules --exclude dist . ubuntu@TU_IP:neonduel/`.
 > También puedes construir la imagen en tu portátil y enviarla ya hecha, sin
 > compilar nada en la VPS:
 >
@@ -103,8 +107,8 @@ sale desde la máquina hacia Cloudflare y nadie entra de fuera.
    sudo systemctl restart cloudflared
    ```
 
-   Si estás dentro por `ssh.nicolasdalessandro.dev`, el reinicio corta tu propia
-   sesión: el túnel vuelve en un par de segundos y basta con reconectar.
+   Si entras a la máquina por SSH a través del mismo túnel, el reinicio corta tu
+   propia sesión: el túnel vuelve en un par de segundos y basta con reconectar.
 
 Los WebSocket pasan por el túnel sin configuración adicional, y como la página se
 sirve por `https://`, el cliente cambia a `wss://` por su cuenta. No hay ninguna

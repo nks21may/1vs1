@@ -7,6 +7,8 @@ duck-jump y patrones de retroceso memorizables.
 No usa un solo archivo de assets: la geometría, las texturas, los efectos y el
 sonido se generan por código.
 
+En línea: <https://neonduel.nicolasdalessandro.dev>
+
 ```bash
 npm install
 npm run dev     # servidor en :8080 y cliente en :5173
@@ -379,8 +381,17 @@ El contenedor escucha solo en el loopback, para dejarlo detrás de lo que ya hay
 en la máquina --un túnel de Cloudflare, un nginx--; con `PUBLISH=0.0.0.0:80` se
 expone directamente. La imagen se construye en dos etapas y la final se queda con
 el bundle del servidor, el cliente compilado y `ws`, así que vale igual en x86_64
-que en ARM64. Los pasos completos para la VPS gratuita de Oracle Cloud están en
-[DEPLOY.md](DEPLOY.md).
+que en ARM64. Para levantarlo a mano en una VPS propia, como la gratuita de
+Oracle Cloud, los pasos están en [DEPLOY.md](DEPLOY.md).
+
+La instancia de <https://neonduel.nicolasdalessandro.dev> no se despliega a mano.
+En cada push a `main`, la CI (`.github/workflows/ci.yml`) corre los mismos
+chequeos que `npm run check` y, si pasan, publica la imagen en GHCR como
+`ghcr.io/nks21may/1vs1`, con `latest` y el SHA del commit. La VPS no tiene
+puertos abiertos --todo entra por un túnel de Cloudflare--, así que en vez de que
+GitHub empuje el deploy, la VPS lo tira: el timer de un repo de infraestructura
+aparte baja `latest` cada dos minutos, recrea el contenedor si la imagen cambió
+y, si la nueva no queda sana, vuelve a la anterior.
 
 Cada partida es una sesión independiente en memoria; el emparejamiento junta a los
 jugadores de dos en dos y libera la sesión cuando se vacía. Para escalar a varias
